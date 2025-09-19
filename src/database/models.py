@@ -12,7 +12,7 @@ class Game(Base):
     status = Column(String(50), default='esperando jugadores') # 'esperando jugadores', 'en curso', 'finalizada'
     max_players = Column(Integer, nullable=False)
     min_players = Column(Integer, nullable=False)
-    players = relationship("Player", back_populates="games")
+    players = relationship("Player", back_populates="game")
 
 class Player(Base):
     __tablename__ = 'players'
