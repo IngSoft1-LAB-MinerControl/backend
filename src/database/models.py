@@ -1,6 +1,6 @@
-from sqlalchemy import Column, ForeignKey, Integer, String, Boolean, CheckConstraint , DateTime, Text, JSON
+from sqlalchemy import Column, ForeignKey, Integer, String, Boolean, CheckConstraint , DateTime, Text, JSON, Date 
 from sqlalchemy.orm import relationship
-from .database import Base
+from src.database.database import Base
 import datetime
 import uuid
 
@@ -19,5 +19,10 @@ class Player(Base):
     player_id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(100), nullable=False)
     host = Column(Boolean, default=False)
+    birth_date = Column(Date, nullable = False)
     game_id = Column(Integer, ForeignKey("games.game_id"), nullable=False)  
     game = relationship("Game", back_populates="players")
+    
+   
+
+
