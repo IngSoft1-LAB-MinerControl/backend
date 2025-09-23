@@ -21,8 +21,9 @@ def list_players(game_id : int ,db: Session = Depends(get_db)):
 def create_player(player : Player_Base, db: Session = Depends(get_db)):
     new_player = Player (name = player.name,
                             host = player.host,
-                            game_id = player.game_id
-    )
+                            game_id = player.game_id ,
+                            birth_date = player.birth_date
+                        )
     db.add(new_player)
     db.commit()
     db.refresh(new_player) #aca traigo el id generado por la db 
