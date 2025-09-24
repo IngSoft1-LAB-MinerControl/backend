@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends  #te permite definir las rutas o subrutas por separado
+from fastapi import APIRouter, Depends, HTTPException  #te permite definir las rutas o subrutas por separado
 from sqlalchemy.orm import Session  
 from src.database.database import SessionLocal, get_db
 from src.database.models import Game 
@@ -12,27 +12,35 @@ def list_games (db: Session = Depends(get_db)) :
 
 
 
-@game.post ("/games")
+@game.post ("/games", status_code=201, response_model=Game_Base)
 def create_game (game : Game_Base, db: Session = Depends(get_db)) : 
     new_game = Game (status = game.status,
                         max_players = game.max_players,
                         min_players = game.min_players,
                         name = game.name)
     db.add(new_game)
-    db.commit()
-    db.refresh(new_game)
+    try:
+        db.commit()
+        db.refresh(new_game)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error creating game: {str(e)}")
     return (new_game)
 
 
-@game.delete("/game/{game_id}")
+@game.delete("/game/{game_id}", status_code=204)
 def delete_game(game_id: int, db:Session = Depends(get_db)):
     game = db.get(Game, game_id) 
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
     try:
         db.delete(game)
         db.commit()
-    except Exception:
+    except Exception as e:
         db.rollback()
-    return game 
+        raise HTTPException(status_code=400, detail=f"Error deleting game: {str(e)}")
+    return None
+
     
 
 

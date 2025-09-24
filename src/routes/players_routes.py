@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends  #te permite definir las rutas o subrutas por separado
+from fastapi import APIRouter, Depends, HTTPException  #te permite definir las rutas o subrutas por separado
 from sqlalchemy.orm import Session  
 from src.database.database import SessionLocal, get_db
 from src.database.models import Player 
@@ -13,31 +13,38 @@ player = APIRouter() # ahora el player es lo mismo que hacer app
 
 @player.get ("/lobby/players/{game_id}")
 def list_players(game_id : int ,db: Session = Depends(get_db)):
-    #Falta completar listar players por game id
-     
-    return db.query(Player).filter( Player.game_id == game_id).all()
+    players = db.query(Player).filter(Player.game_id == game_id).all() # .all() me devuelve una lista, si no hay nada devuelve lista vacia
+    if not players:
+        raise HTTPException(status_code=404, detail="No players found for the given game_id")
+    return players
 
-@player.post("/players")
+@player.post("/players", status_code=201, response_model=Player_Base)
 def create_player(player : Player_Base, db: Session = Depends(get_db)):
     new_player = Player (name = player.name,
                             host = player.host,
-                            game_id = player.game_id
-    )
+                            game_id = player.game_id,
+                            birth_date = player.birth_date)
     db.add(new_player)
-    db.commit()
-    db.refresh(new_player) #aca traigo el id generado por la db 
+    try:
+        db.commit()
+        db.refresh(new_player) #aca traigo el id generado por la db 
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error creating player: {str(e)}")
     return new_player
 
 
-@player.delete("/players/{player_id}")
+@player.delete("/players/{player_id}", status_code=204)
 def delete_player(player_id: int, db:Session = Depends(get_db)):
     player = db.get(Player, player_id) 
-    print (player)
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
     try:
         db.delete(player)
         db.commit()
-    except Exception:
+    except Exception as e:
         db.rollback()
-    return player
+        raise HTTPException(status_code=400, detail=f"Error deleting player: {str(e)}")
+    return None
 
 
