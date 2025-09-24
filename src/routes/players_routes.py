@@ -31,7 +31,7 @@ def create_player(player : Player_Base, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Error creating player: {str(e)}")
-    return new_player
+    return new_player.player_id
 
 
 @player.delete("/players/{player_id}", status_code=204)
