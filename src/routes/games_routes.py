@@ -12,7 +12,7 @@ def list_games (db: Session = Depends(get_db)) :
 
 
 
-@game.post ("/games", status_code=201, response_model=Game_Base)
+@game.post ("/games", status_code=201) #devolvia un int y queria devolver una response con el schema de game_base
 def create_game (game : Game_Base, db: Session = Depends(get_db)) : 
     new_game = Game (status = game.status,
                         max_players = game.max_players,
@@ -25,7 +25,7 @@ def create_game (game : Game_Base, db: Session = Depends(get_db)) :
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Error creating game: {str(e)}")
-    return new_game.new_game_id
+    return new_game.game_id
 
 
 @game.delete("/game/{game_id}", status_code=204)

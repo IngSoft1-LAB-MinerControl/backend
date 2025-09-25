@@ -18,7 +18,7 @@ def list_players(game_id : int ,db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="No players found for the given game_id")
     return players
 
-@player.post("/players", status_code=201, response_model=Player_Base)
+@player.post("/players", status_code=201)
 def create_player(player : Player_Base, db: Session = Depends(get_db)):
     new_player = Player (name = player.name,
                             host = player.host,
