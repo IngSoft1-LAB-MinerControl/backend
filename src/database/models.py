@@ -27,6 +27,8 @@ class Player(Base):
     game_id = Column(Integer, ForeignKey("games.game_id"), nullable=False)  
     game = relationship("Game", back_populates="players")
     turn_order = Column(Integer) # Posición del jugador en el turn
+    cards = relationship("Card", back_populates="player")
+    secrets = relationship("Secrets", back_populates="player")
 
 class Card(Base):
     __tablename__ = 'cards'
@@ -34,7 +36,7 @@ class Card(Base):
     type = Column(String(15))
     picked_up = Column(Boolean)
     dropped = Column(Boolean)
-    player_id = Column(Integer, ForeignKey("players.player_id"), nullable=False)
+    player_id = Column(Integer, ForeignKey("players.player_id"), nullable=True)
     player = relationship("Player", back_populates="cards")
     game_id = Column(Integer, ForeignKey("games.game_id"), nullable=False)  
     game = relationship("Game", back_populates="cards")
@@ -45,8 +47,8 @@ class Secrets(Base):
     murderer = Column(Boolean)
     acomplice = Column(Boolean)
     revelated = Column(Boolean)
-    player_id = Column(Integer, ForeignKey("players.player_id"), nullable=False)  
-    player = relationship("Player", back_populates="players")
+    player_id = Column(Integer, ForeignKey("players.player_id"), nullable=True)  
+    player = relationship("Player", back_populates="secrets")
     game_id = Column(Integer, ForeignKey("games.game_id"), nullable=False)  
     game = relationship("Game", back_populates="secrets")
 
