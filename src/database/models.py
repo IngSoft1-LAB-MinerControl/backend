@@ -13,8 +13,6 @@ class Game(Base):
     max_players = Column(Integer, nullable=False)
     min_players = Column(Integer, nullable=False)
     players = relationship("Player", back_populates="game")
-    players_amount = Column(Integer,nullable = False)
-    current_turn = Column(Integer, nullable = True)
     cards = relationship("Card", back_populates="game")
     secrets = relationship("Secrets", back_populates="game")
 
@@ -26,7 +24,6 @@ class Player(Base):
     birth_date = Column(Date, nullable = False)
     game_id = Column(Integer, ForeignKey("games.game_id"), nullable=False)  
     game = relationship("Game", back_populates="players")
-    turn_order = Column(Integer) # Posición del jugador en el turn
     cards = relationship("Card", back_populates="player")
     secrets = relationship("Secrets", back_populates="player")
 
