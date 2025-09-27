@@ -12,6 +12,8 @@ def update_players_on_game (game_id : int, db : Session = Depends(get_db)):
         game.players_amount += 1
         if game.players_amount >= game.min_players : 
             game.status = 'bootable'
+        if game.players_amount == game.max_players :
+            game.status = 'Full'
         db.add(game)
         try: 
             db.commit()
@@ -22,15 +24,7 @@ def update_players_on_game (game_id : int, db : Session = Depends(get_db)):
     
         return game.players_amount
 
-    else :
-        game.status = 'Full'
-        db.add(game)
-        try: 
-            db.commit()
-            db.refresh(game)
-        except Exception as e:
-            db.rollback()
-            raise HTTPException(status_code=400, detail=f"Error updating amount of players in game, changing game status to full: {str(e)}")  
+    else :  
         return None 
 
 
