@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException  #te permite definir las r
 from sqlalchemy.orm import Session  
 from src.database.database import SessionLocal, get_db
 from src.database.models import Game 
-from src.schemas.games_schemas import Game_Base
+from src.schemas.games_schemas import Game_Base, Game_Response
 
 game = APIRouter()
 
@@ -10,14 +10,17 @@ game = APIRouter()
 def list_games (db: Session = Depends(get_db)) :
     return db.query(Game).all()
 
+@game.get("/games/availables")
+def list_available_games (db : Session = Depends (get_db)): 
+    return db.query(Game).filter((Game.status == "bootable") |  (Game.status == "waiting players")).all()
 
-
-@game.post ("/games", status_code=201) #devolvia un int y queria devolver una response con el schema de game_base
+@game.post ("/games", status_code=201, response_model = Game_Response) #devolvia un int y queria devolver una response con el schema de game_base
 def create_game (game : Game_Base, db: Session = Depends(get_db)) : 
     new_game = Game (status = game.status,
                         max_players = game.max_players,
                         min_players = game.min_players,
-                        name = game.name)
+                        name = game.name,
+                        players_amount = 0)
     db.add(new_game)
     try:
         db.commit()
@@ -25,7 +28,7 @@ def create_game (game : Game_Base, db: Session = Depends(get_db)) :
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Error creating game: {str(e)}")
-    return new_game.game_id
+    return new_game
 
 
 @game.delete("/game/{game_id}", status_code=204)
@@ -42,7 +45,3 @@ def delete_game(game_id: int, db:Session = Depends(get_db)):
     return None
 
     
-
-
-
-

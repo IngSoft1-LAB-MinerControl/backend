@@ -12,6 +12,8 @@ class Game(Base):
     status = Column(String(50), default='waiting players') # 'esperando jugadores', 'en curso', 'finalizada'
     max_players = Column(Integer, nullable=False)
     min_players = Column(Integer, nullable=False)
+    players_amount = Column(Integer,nullable = False)
+    current_turn = Column(Integer, nullable = True)
     players = relationship("Player", back_populates="game")
     cards = relationship("Card", back_populates="game")
     secrets = relationship("Secrets", back_populates="game")
@@ -22,6 +24,7 @@ class Player(Base):
     name = Column(String(100), nullable=False)
     host = Column(Boolean, default=False)
     birth_date = Column(Date, nullable = False)
+    turn_order = Column(Integer) # Posición del jugador en el turno
     game_id = Column(Integer, ForeignKey("games.game_id"), nullable=False)  
     game = relationship("Game", back_populates="players")
     cards = relationship("Card", back_populates="player")

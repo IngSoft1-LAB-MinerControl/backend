@@ -6,4 +6,12 @@ class Game_Base(BaseModel) :
     max_players : int 
     min_players : int
     status : str 
-    name : str 
+    name : str
+
+class Game_Response (BaseModel) : 
+    game_id : Optional[int] = None
+    max_players : int 
+    min_players : int
+    status : str 
+    name : str
+    players_amount : int      

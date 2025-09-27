@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException  #te permite definir las r
 from sqlalchemy.orm import Session  
 from src.database.database import SessionLocal, get_db
 from src.database.models import Player 
-from src.schemas.players_schemas import Player_Base 
+from src.schemas.players_schemas import Player_Base
+from src.database.services.services_games import update_players_on_game
 
 player = APIRouter() # ahora el player es lo mismo que hacer app
 
@@ -24,13 +25,24 @@ def create_player(player : Player_Base, db: Session = Depends(get_db)):
                             host = player.host,
                             game_id = player.game_id,
                             birth_date = player.birth_date)
-    db.add(new_player)
-    try:
-        db.commit()
-        db.refresh(new_player) #aca traigo el id generado por la db 
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=400, detail=f"Error creating player: {str(e)}")
+    updated_game =  update_players_on_game(new_player.game_id, db)
+    if not updated_game :
+        raise HTTPException(status_code=400, detail=f"Game already full")
+    else :
+        db.add(new_player)
+        try:
+            db.commit()
+            db.refresh(new_player) #aca traigo el id generado por la db
+        
+
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=400, detail=f"Error creating player: {str(e)}")
+        
+
+    
+
+    
     return new_player.player_id
 
 
