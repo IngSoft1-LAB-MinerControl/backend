@@ -1,5 +1,5 @@
 from database.database import Base, engine
-from modelos.modelos import  Player, Game
+from database.models import  Player, Game
 
 
 Base.metadata.drop_all(bind=engine)
