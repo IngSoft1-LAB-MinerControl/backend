@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException  #te permite definir las r
 from sqlalchemy.orm import Session  
 from src.database.database import SessionLocal, get_db
 from src.database.models import Game 
-from src.schemas.games_schemas import Game_Base
+from src.schemas.games_schemas import Game_Base, Game_Response
 
 game = APIRouter()
 
@@ -14,7 +14,7 @@ def list_games (db: Session = Depends(get_db)) :
 def list_available_games (db : Session = Depends (get_db)): 
     return db.query(Game).filter((Game.status == "bootable") |  (Game.status == "waiting players")).all()
 
-@game.post ("/games", status_code=201) #devolvia un int y queria devolver una response con el schema de game_base
+@game.post ("/games", status_code=201, response_model = Game_Response) #devolvia un int y queria devolver una response con el schema de game_base
 def create_game (game : Game_Base, db: Session = Depends(get_db)) : 
     new_game = Game (status = game.status,
                         max_players = game.max_players,
