@@ -28,7 +28,7 @@ def create_game (game : Game_Base, db: Session = Depends(get_db)) :
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Error creating game: {str(e)}")
-    return new_game.game_id
+    return new_game
 
 
 @game.delete("/game/{game_id}", status_code=204)
