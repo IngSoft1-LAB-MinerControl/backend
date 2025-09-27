@@ -9,12 +9,12 @@ class Game(Base):
     __tablename__ = 'games' 
     game_id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(15), nullable=False)
-    status = Column(String(50), default='esperando jugadores') # 'esperando jugadores', 'en curso', 'finalizada'
+    status = Column(String(50), default='waiting players') # 'esperando jugadores', 'en curso', 'finalizada'
     max_players = Column(Integer, nullable=False)
     min_players = Column(Integer, nullable=False)
     players = relationship("Player", back_populates="game")
-    players_amount = Column(Integer)
-    current_turn = Column(Integer)
+    players_amount = Column(Integer,nullable = False)
+    current_turn = Column(Integer, nullable = True)
 
 class Player(Base):
     __tablename__ = 'players'
