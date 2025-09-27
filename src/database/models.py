@@ -29,24 +29,24 @@ class Player(Base):
     turn_order = Column(Integer) # Posición del jugador en el turn
 
 class Card(Base):
-    _tablename_ = 'cards'
+    __tablename__ = 'cards'
     card_id = Column(Integer, primary_key=True, autoincrement=True)
     type = Column(String(15))
     picked_up = Column(Boolean)
     dropped = Column(Boolean)
     player_id = Column(Integer, ForeignKey("players.player_id"), nullable=False)
-    player = relationship("Players", back_populates="cards")
+    player = relationship("Player", back_populates="cards")
     game_id = Column(Integer, ForeignKey("games.game_id"), nullable=False)  
     game = relationship("Game", back_populates="cards")
 
 class Secrets(Base):
-    _tablename_ = 'secrets'
+    __tablename__  = 'secrets'
     secret_id = Column(Integer, primary_key=True, autoincrement=True)
     murderer = Column(Boolean)
     acomplice = Column(Boolean)
     revelated = Column(Boolean)
     player_id = Column(Integer, ForeignKey("players.player_id"), nullable=False)  
-    player = relationship("Players", back_populates="players")
+    player = relationship("Player", back_populates="players")
     game_id = Column(Integer, ForeignKey("games.game_id"), nullable=False)  
     game = relationship("Game", back_populates="secrets")
 
