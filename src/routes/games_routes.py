@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from src.database.database import SessionLocal, get_db
 from src.database.models import Game 
 from src.schemas.games_schemas import Game_Base, Game_Response
+from src.database.services.services_games import assign_turn_to_players
 
 game = APIRouter()
 
@@ -44,4 +45,11 @@ def delete_game(game_id: int, db:Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=f"Error deleting game: {str(e)}")
     return None
 
-    
+
+
+@game.post("/game/beginning/{game_id}", status_code = 202 ) 
+def initialize_game (game_id : int, db : Session = Depends(get_db)):
+    initialized_game = assign_turn_to_players (game_id, db)
+
+    return initialized_game
+
