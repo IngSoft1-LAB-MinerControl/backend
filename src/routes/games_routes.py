@@ -10,15 +10,15 @@ from src.database.services.services_secrets import init_secrets
 
 game = APIRouter()
 
-@game.get("/games")
+@game.get("/games",tags = ["Games"])
 def list_games (db: Session = Depends(get_db)) :
     return db.query(Game).all()
 
-@game.get("/games/availables")
+@game.get("/games/availables",tags = ["Games"])
 def list_available_games (db : Session = Depends (get_db)): 
     return db.query(Game).filter((Game.status == "bootable") |  (Game.status == "waiting players")).all()
 
-@game.post ("/games", status_code=201, response_model = Game_Response) #devolvia un int y queria devolver una response con el schema de game_base
+@game.post ("/games", status_code=201, response_model = Game_Response,tags = ["Games"]) #devolvia un int y queria devolver una response con el schema de game_base
 def create_game (game : Game_Base, db: Session = Depends(get_db)) : 
     new_game = Game (status = game.status,
                         max_players = game.max_players,
@@ -35,7 +35,7 @@ def create_game (game : Game_Base, db: Session = Depends(get_db)) :
     return new_game
 
 
-@game.delete("/game/{game_id}", status_code=204)
+@game.delete("/game/{game_id}", status_code=204, tags = ["Games"])
 def delete_game(game_id: int, db:Session = Depends(get_db)):
     game = db.get(Game, game_id) 
     if not game:
@@ -50,7 +50,7 @@ def delete_game(game_id: int, db:Session = Depends(get_db)):
 
 
 
-@game.post("/game/beginning/{game_id}", status_code = 202 ) 
+@game.post("/game/beginning/{game_id}", status_code = 202, tags = ["Games"] ) 
 def initialize_game (game_id : int, db : Session = Depends(get_db)):
     turns_assigned = assign_turn_to_players (game_id, db)
     cards_initialized = init_cards (game_id, db)
@@ -60,5 +60,19 @@ def initialize_game (game_id : int, db : Session = Depends(get_db)):
 
 
 
-    return {"Message : Juego inicializado"}
+    return {"Message : Game initialized"}
 
+@game.put ("/game/update_turn/{game_id}", status_code = 202, tags = ["Games"])
+def update_turn (game_id : int , db: Session = Depends(get_db)) : 
+    game = db.query(Game).where(Game.game_id == game_id).first()
+    if game.current_turn < game.max_players : 
+        game.current_turn += 1 
+    else : 
+        game.current_turn = 1
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error updating turn's game: {str(e)}")
+
+    return game.current_turn

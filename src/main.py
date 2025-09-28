@@ -6,7 +6,10 @@ from src.routes.secrets_routes import secret
 from fastapi.middleware.cors import CORSMiddleware
 
 
-app = FastAPI()
+app = FastAPI(
+    title = "Agatha Christie's Death on the Cards API ",
+    description = "API to connect with server for the respective game"
+)
 
 app.add_middleware(
     CORSMiddleware,
