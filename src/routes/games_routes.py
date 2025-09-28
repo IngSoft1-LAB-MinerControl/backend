@@ -5,7 +5,7 @@ from src.database.models import Game
 from src.schemas.games_schemas import Game_Base, Game_Response
 from src.database.services.services_games import assign_turn_to_players
 from src.database.services.services_cards import init_cards, deal_cards_to_players
-from src.database.services.services_secrets import init_secrets
+from src.database.services.services_secrets import init_secrets, deal_secrets_to_players
 
 
 game = APIRouter()
@@ -56,10 +56,7 @@ def initialize_game (game_id : int, db : Session = Depends(get_db)):
     cards_initialized = init_cards (game_id, db)
     secrets_initialized = init_secrets(game_id, db)
     cards_dealt = deal_cards_to_players (game_id, db)
-
-
-
-
+    secrets_dealt = deal_secrets_to_players (game_id, db)
     return {"Message : Game initialized"}
 
 @game.put ("/game/update_turn/{game_id}", status_code = 202, tags = ["Games"])
