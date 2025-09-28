@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException  #te permite definir las r
 from sqlalchemy.orm import Session  
 from src.database.database import SessionLocal, get_db
 from src.database.models import Card 
+import random
 
 card = APIRouter()
 
@@ -12,7 +13,7 @@ def list_cards_ingame(game_id : int , db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="No cards found for the given game_id")
     return cards
 
-@card.get("/lobby/cards/{player_id}")
+@card.get("/lobby/list/cards/{player_id}")
 def list_card_ofplayer(player_id : int , db: Session = Depends(get_db)):
     cards = db.query(Card).filter(Card.player_id == player_id).all() # .all() me devuelve una lista, si no hay nada devuelve lista vacia
     if not cards:
@@ -41,11 +42,14 @@ def init_cards(game_id : int , db: Session = Depends(get_db)):
     
     return {"message": "61 cards created successfully"}
 
-@card.put("/cards/{players_id}")
-def pickup_a_card(player_id : int , card_id : int , db: Session = Depends(get_db)):
-    card = db.get(Card , card_id)
-    if not card:
-        raise HTTPException(status_code=404, detail="Card not found")
+@card.put("/cards/{players_id},{game_id}")
+def pickup_a_card(player_id : int , game_id : int , db: Session = Depends(get_db)):
+    deck = db.query(Card).filter(Card.game_id == game_id, Card.player_id == None).all()
+    random.shuffle(deck)
+    if deck:
+        card = deck[0]
+    else:
+        return {"message: Game finished"}
     try:
         card.player_id = player_id
         db.commit()
@@ -53,5 +57,3 @@ def pickup_a_card(player_id : int , card_id : int , db: Session = Depends(get_db
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Error assigning card to player: {str(e)}")
     return None
-
-
