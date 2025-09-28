@@ -20,28 +20,6 @@ def list_card_ofplayer(player_id : int , db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="No cards found for the given player_id")
     return cards
 
-@card.post("/cards/{game_id}")
-def init_cards(game_id : int , db: Session = Depends(get_db)):
-    new_cards_list = []
-    for _ in range(61): 
-        new_card_instance = Card(
-        type="Carta generica",
-        picked_up=False,
-        dropped=False,
-        player_id=None,
-        game_id=game_id
-        )
-        new_cards_list.append(new_card_instance)
-
-    try:
-        db.add_all(new_cards_list)
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=400, detail=f"Error creating cards: {str(e)}")
-    
-    return {"message": "61 cards created successfully"}
-
 @card.put("/cards/pick_up/{players_id},{game_id}" , status_code=200)
 def pickup_a_card(player_id : int , game_id : int , db: Session = Depends(get_db)):
     deck = db.query(Card).filter(Card.game_id == game_id, Card.player_id == None).all()

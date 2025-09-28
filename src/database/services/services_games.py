@@ -34,7 +34,6 @@ def assign_turn_to_players (game_id : int, db :Session = Depends (get_db)) :
     today = date.today()
     acBday = date(today.year,9, 15)
     game = db.query(Game).where(Game.game_id == game_id).first()
-    print (game) 
     players = db.query(Player).filter(Player.game_id == game_id).all()
     players_birthday = db.query (Player.player_id, extract('month', Player.birth_date).label("month"), 
                         extract('day', Player.birth_date).label("day")).where(Player.game_id == game_id).all()

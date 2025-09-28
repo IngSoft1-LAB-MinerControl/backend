@@ -4,6 +4,9 @@ from src.database.database import SessionLocal, get_db
 from src.database.models import Game 
 from src.schemas.games_schemas import Game_Base, Game_Response
 from src.database.services.services_games import assign_turn_to_players
+from src.database.services.services_cards import init_cards, deal_cards_to_players
+from src.database.services.services_secrets import init_secrets
+
 
 game = APIRouter()
 
@@ -49,7 +52,13 @@ def delete_game(game_id: int, db:Session = Depends(get_db)):
 
 @game.post("/game/beginning/{game_id}", status_code = 202 ) 
 def initialize_game (game_id : int, db : Session = Depends(get_db)):
-    initialized_game = assign_turn_to_players (game_id, db)
+    turns_assigned = assign_turn_to_players (game_id, db)
+    cards_initialized = init_cards (game_id, db)
+    secrets_initialized = init_secrets(game_id, db)
+    cards_dealt = deal_cards_to_players (game_id, db)
 
-    return initialized_game
+
+
+
+    return {"Message : Juego inicializado"}
 
