@@ -65,3 +65,16 @@ def init_cards(game_id : int , db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=f"Error creating cards: {str(e)}")
     
     return {"message": "61 cards created successfully"}
+
+
+def only_6 (player_id , db: Session = Depends(get_db)):
+    cartas_levantadas = db.query(Card).filter(
+        Card.player_id == player_id,
+        Card.picked_up == True,
+        Card.dropped == False
+    ).count()
+    if cartas_levantadas >= 6:
+        return True
+    else:
+        return False
+    
