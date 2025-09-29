@@ -80,3 +80,10 @@ def update_turn (game_id : int , db: Session = Depends(get_db)) :
         raise HTTPException(status_code=400, detail=f"Error updating turn's game: {str(e)}")
 
     return game.current_turn
+
+@game.get("/games/{game_id}", tags=["Games"])
+def get_game(game_id: int, db: Session = Depends(get_db)):
+    game = db.get(Game, game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+    return game
