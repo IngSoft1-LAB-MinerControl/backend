@@ -52,18 +52,21 @@ def delete_game(game_id: int, db:Session = Depends(get_db)):
 
 @game.post("/game/beginning/{game_id}", status_code = 202, tags = ["Games"] ) 
 def initialize_game (game_id : int, db : Session = Depends(get_db)):
-    turns_assigned = assign_turn_to_players (game_id, db)
-    cards_initialized = init_cards (game_id, db)
-    secrets_initialized = init_secrets(game_id, db)
-    cards_dealt = deal_cards_to_players (game_id, db)
-    secrets_dealt = deal_secrets_to_players (game_id, db)
     game = db.query(Game).where(Game.game_id == game_id).first()
-    game.status = "in course"
-    try:
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=400, detail=f"Error updating turn's game: {str(e)}")
+    if game.players_amount >= game.min_players :  
+        turns_assigned = assign_turn_to_players (game_id, db)
+        cards_initialized = init_cards (game_id, db)
+        secrets_initialized = init_secrets(game_id, db)
+        cards_dealt = deal_cards_to_players (game_id, db)
+        secrets_dealt = deal_secrets_to_players (game_id, db)
+        game.status = "in course"
+        try:
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=400, detail=f"Error updating turn's game: {str(e)}")
+    else : 
+        raise HTTPException(status_code=424, detail=f"Error, you need more players to start game")
     return game
 
 @game.put ("/game/update_turn/{game_id}", status_code = 202, tags = ["Games"])
