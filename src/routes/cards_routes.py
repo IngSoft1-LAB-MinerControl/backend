@@ -7,21 +7,21 @@ import random
 
 card = APIRouter()
 
-@card.get("/lobby/cards/{game_id}")
+@card.get("/lobby/cards/{game_id}",tags = ["Cards"])
 def list_cards_ingame(game_id : int , db: Session = Depends(get_db)):
     cards = db.query(Card).filter(Card.game_id == game_id).all() # .all() me devuelve una lista, si no hay nada devuelve lista vacia
     if not cards:
         raise HTTPException(status_code=404, detail="No cards found for the given game_id")
     return cards
 
-@card.get("/lobby/list/cards/{player_id}")
+@card.get("/lobby/list/cards/{player_id}", tags = ["Cards"])
 def list_card_ofplayer(player_id : int , db: Session = Depends(get_db)):
     cards = db.query(Card).filter(Card.player_id == player_id , Card.dropped == False).all() # .all() me devuelve una lista, si no hay nada devuelve lista vacia
     if not cards:
         raise HTTPException(status_code=404, detail="No cards found for the given player_id")
     return cards
 
-@card.put("/cards/pick_up/{player_id},{game_id}" , status_code=200)
+@card.put("/cards/pick_up/{players_id},{game_id}" , status_code=200, tags = ["Cards"])
 def pickup_a_card(player_id : int , game_id : int , db: Session = Depends(get_db)):
     has_6_cards = only_6(player_id , db)
     if has_6_cards: 
@@ -40,8 +40,7 @@ def pickup_a_card(player_id : int , game_id : int , db: Session = Depends(get_db
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Error assigning card to player: {str(e)}")
     return None
-
-@card.put("/cards/drop/{player_id}" , status_code=200)
+@card.put("/cards/drop/{players_id}" , status_code=200, tags = ["Cards"])
 def discard_card(player_id : int , db: Session = Depends(get_db)):
     card = db.query(Card).filter(Card.player_id == player_id , Card.dropped == False).first()
     if not card:
