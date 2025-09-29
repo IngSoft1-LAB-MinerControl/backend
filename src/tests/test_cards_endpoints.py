@@ -53,6 +53,13 @@ def test_pickup_a_card():
     assert response.status_code == 200
     # Puede devolver None o un mensaje de juego terminado
     assert response.json() is None or "message: Game finished" in str(response.json())
+    # Verificar que la carta se actualizó correctamente en la base de datos
+    with TestingSessionLocal() as db:
+        card = db.query(Card).filter(Card.card_id == 1).first()
+        assert card is not None
+        assert card.player_id == 1
+        assert card.game_id == 1
+        assert card.picked_up is True
 
 def test_list_card_ofplayer_has_card():
     # Suponiendo que existe un player_id válido en la base de datos
@@ -73,6 +80,13 @@ def test_discard_card():
     assert response.status_code == 200
     # Puede devolver mensaje de éxito o que todas las cartas fueron descartadas
     assert "message:" in str(response.json())
+    # Verificar que la carta se actualizó correctamente en la base de datos
+    with TestingSessionLocal() as db:
+        card = db.query(Card).filter(Card.card_id == 1).first()
+        assert card is not None
+        assert card.player_id == 1
+        assert card.dropped is True
+        assert card.picked_up is False
 
 def test_list_card_ofplayer():
     # Suponiendo que existe un player_id válido en la base de datos
@@ -105,4 +119,3 @@ def test_discard_card_twice():
     response2 = client.put(f"/cards/drop/{player_id}")
     assert response2.status_code == 200
     assert "All cards dropped" in str(response2.json()) or "message:" in str(response2.json())
-
