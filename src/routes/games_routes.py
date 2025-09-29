@@ -57,7 +57,8 @@ def initialize_game (game_id : int, db : Session = Depends(get_db)):
     secrets_initialized = init_secrets(game_id, db)
     cards_dealt = deal_cards_to_players (game_id, db)
     secrets_dealt = deal_secrets_to_players (game_id, db)
-    return {"Message : Game initialized"}
+    game = db.query(Game).where(Game.game_id == game_id).first()
+    return {"Message : Game initialized"}, game
 
 @game.put ("/game/update_turn/{game_id}", status_code = 202, tags = ["Games"])
 def update_turn (game_id : int , db: Session = Depends(get_db)) : 
