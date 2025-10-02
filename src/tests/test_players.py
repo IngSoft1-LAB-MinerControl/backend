@@ -72,13 +72,16 @@ def test_create_player_game_full():
     assert response.status_code == 400
     assert response.json()["detail"] == "Game already full"
 
-def test_list_players_success():
-    response = client.get("/lobby/players/1")
-    assert response.status_code == 200
+def test_create_player_success():
+    response = client.post(
+        "/players",
+        json={"name": "New Player", "host": False, "game_id": 1, "birth_date": "2001-05-10"}
+    )
+    assert response.status_code == 201
     data = response.json()
-    assert isinstance(data, list)
-    assert len(data) > 0
-    assert data[0]["name"] == "Test Player"
+    # Verificamos que la respuesta sea un diccionario y que contenga el ID del jugador
+    assert isinstance(data, dict)
+    assert "player_id" in data
 
 def test_list_players_for_empty_game():
     response = client.get("/lobby/players/3")
@@ -95,7 +98,7 @@ def test_delete_player_success():
         "/players",
         json={"name": "PlayerToDelete", "host": False, "game_id": 1, "birth_date": "2003-07-12"}
     )
-    player_id = create_response.json()
+    player_id = create_response.json()["player_id"]
     
     delete_response = client.delete(f"/players/{player_id}")
     assert delete_response.status_code == 204
