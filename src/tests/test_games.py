@@ -103,7 +103,7 @@ def test_initialize_game() : #Voy a inicializr el g3 que defini arriba
     response = client.post(f"/game/beginning/{3}")
     assert response.status_code == 202 
     data = response.json()
-    assert data[1]["current_turn"] == 1 
+    assert data["current_turn"] == 1 
     response_cards = client.get(f"lobby/cards/{3}")
     assert response_cards.status_code == 200
     data_cards = response_cards.json()

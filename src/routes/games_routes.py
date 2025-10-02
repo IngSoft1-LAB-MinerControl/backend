@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException  #te permite definir las r
 from sqlalchemy.orm import Session  
 from src.database.database import SessionLocal, get_db
 from src.database.models import Game 
-from src.schemas.games_schemas import Game_Base, Game_Response
+from src.schemas.games_schemas import Game_Base, Game_Response, Game_Initialized
 from src.database.services.services_games import assign_turn_to_players
 from src.database.services.services_cards import init_cards, deal_cards_to_players
 from src.database.services.services_secrets import init_secrets, deal_secrets_to_players
@@ -50,7 +50,7 @@ def delete_game(game_id: int, db:Session = Depends(get_db)):
 
 
 
-@game.post("/game/beginning/{game_id}", status_code = 202, tags = ["Games"] ) 
+@game.post("/game/beginning/{game_id}", status_code = 202,response_model= Game_Initialized, tags = ["Games"] ) 
 def initialize_game (game_id : int, db : Session = Depends(get_db)):
     game = db.query(Game).where(Game.game_id == game_id).first()
     if game.players_amount >= game.min_players :  

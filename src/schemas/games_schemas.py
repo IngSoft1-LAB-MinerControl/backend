@@ -15,3 +15,10 @@ class Game_Response (BaseModel) :
     status : str 
     name : str
     players_amount : int      
+
+class Game_Initialized (BaseModel) : 
+    game_id : int 
+    status : str 
+    name : str 
+    players_amount : int 
+    current_turn : int  
