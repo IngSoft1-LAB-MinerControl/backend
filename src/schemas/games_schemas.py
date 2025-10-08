@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional 
 
 class Game_Base(BaseModel) : 
@@ -14,7 +14,9 @@ class Game_Response (BaseModel) :
     min_players : int
     status : str 
     name : str
-    players_amount : int      
+    players_amount : int
+    
+    model_config = ConfigDict(from_attributes=True)    
 
 class Game_Initialized (BaseModel) : 
     game_id : int 
