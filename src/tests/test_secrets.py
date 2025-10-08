@@ -27,12 +27,17 @@ client = TestClient(app)
 
 # Poblar la base de datos con datos de ejemplo
 with TestingSessionLocal() as db:
-    game = Game(game_id=1, name="Secret Game", status="en curso", max_players=4, min_players=2, players_amount=1)
-    player = Player(player_id=1, name="Secret Player", host=True, birth_date=datetime.date(2000, 1, 1), game_id=1)
-    secret = Secrets(secret_id=1, murderer=True, acomplice=False, revelated=False, player_id=1, game_id=1)
+    game = Game(game_id=1, name="Secret Game", status="en curso", max_players=4, min_players=2, players_amount=2)
+    # Jugador 1 con un secreto
+    player1 = Player(player_id=1, name="Secret Player", host=True, birth_date=datetime.date(2000, 1, 1), game_id=1)
+    secret1 = Secrets(secret_id=1, murderer=True, acomplice=False, revelated=False, player_id=1, game_id=1)
+    # Jugador 2 sin secretos
+    player2 = Player(player_id=2, name="Innocent Player", host=False, birth_date=datetime.date(2001, 1, 1), game_id=1)
+    
     db.add(game)
-    db.add(player)
-    db.add(secret)
+    db.add(player1)
+    db.add(secret1)
+    db.add(player2)
     db.commit()
 
 def test_list_secrets_of_player_success():
@@ -41,9 +46,16 @@ def test_list_secrets_of_player_success():
     data = response.json()
     assert isinstance(data, list)
     assert len(data) == 1
-    assert data[0]["murderer"] == True
+    assert data[0]["murderer"] is True
 
-def test_list_secrets_of_player_not_found():
-    response = client.get("/lobby/secrets/999")
+def test_list_secrets_of_player_with_no_secrets():
+    # El jugador 2 existe pero no tiene secretos asignados
+    response = client.get("/lobby/secrets/2")
     assert response.status_code == 404
     assert response.json()["detail"] == "No secrets found for the given player_id"
+
+def test_list_secrets_of_nonexistent_player():
+    # El jugador 999 no existe
+    response = client.get("/lobby/secrets/999")
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Player not found"

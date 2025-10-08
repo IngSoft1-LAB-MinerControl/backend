@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException  #te permite definir las rutas o subrutas por separado
 from sqlalchemy.orm import Session  
 from src.database.database import SessionLocal, get_db
-from src.database.models import Card 
+from src.database.models import Card, Game 
 from src.database.services.services_cards import only_6
 from src.schemas.card_schemas import Card_Response
 import random
@@ -11,6 +11,9 @@ card = APIRouter()
 @card.get("/lobby/cards/{game_id}", tags=["Cards"], response_model=list[Card_Response])
 def list_cards_ingame(game_id: int, db: Session = Depends(get_db)):
     cards = db.query(Card).filter(Card.game_id == game_id).all()
+    game = db.query(Game).filter(Game.game_id == game_id).first()
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
     if not cards:
         raise HTTPException(status_code=404, detail="No cards found for the given game_id")
     return cards
