@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException  #te permite definir las rutas o subrutas por separado
-from sqlalchemy.orm import Session  
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from sqlalchemy import desc, func  
 from src.database.database import SessionLocal, get_db
 from src.database.models import Card , Game
 from src.database.services.services_cards import only_6
@@ -54,6 +55,12 @@ def discard_card(player_id : int , db: Session = Depends(get_db)):
     if not card:
         raise HTTPException(status_code=404, detail="All cards dropped")       
     try:
+        # Encuentra el valor máximo actual de discardInt en la partida
+        max_discard = db.query(func.max(Card.discardInt)).filter(Card.game_id == card.game_id).scalar()
+        
+        # Asigna el siguiente valor en la secuencia
+        card.discardInt = (max_discard or 0) + 1
+        
         card.dropped = True
         card.picked_up = False
         db.commit()
@@ -69,6 +76,12 @@ def select_card_to_discard(player_id : int, card_id : int, db: Session = Depends
     if not card:
         raise HTTPException(status_code=404, detail="All cards dropped from player or card id invalid to player")       
     try:
+        # Encuentra el valor máximo actual de discardInt en la partida
+        max_discard = db.query(func.max(Card.discardInt)).filter(Card.game_id == card.game_id).scalar()
+
+        # Asigna el siguiente valor en la secuencia
+        card.discardInt = (max_discard or 0) + 1
+
         card.dropped = True
         card.picked_up = False
         db.commit()
@@ -92,3 +105,18 @@ def get_draft_pile(game_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="No cards found in the draft pile for this game.")
     
     return draft_cards
+
+@card.get("/cards/discard-pile/{game_id}", tags=["Cards"], response_model=list[Card_Response])
+def get_top_discard_pile(game_id: int, db: Session = Depends(get_db)):
+    """
+    Obtiene las últimas 5 cartas de la pila de descarte, ordenadas de la más reciente a la más antigua.
+    """
+    discarded_cards = db.query(Card).filter(
+        Card.game_id == game_id,
+        Card.dropped == True
+    ).order_by(desc(Card.discardInt)).limit(5).all()
+
+    if not discarded_cards:
+        raise HTTPException(status_code=404, detail="No cards found in the discard pile for this game.")
+    
+    return discarded_cards

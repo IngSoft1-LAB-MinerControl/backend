@@ -8,6 +8,7 @@ class Card_Response(BaseModel):
     picked_up : bool
     dropped : bool
     type : str
+    draft: bool
+    discardInt: int
     class config:
         orm_mode = True
-    draft: bool 

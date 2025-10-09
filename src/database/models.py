@@ -41,7 +41,8 @@ class Card(Base):
     player = relationship("Player", back_populates="cards")
     game_id = Column(Integer, ForeignKey("games.game_id"), nullable=False)  
     game = relationship("Game", back_populates="cards")
-    draft = Column(Boolean, default=False)  # Indica si la carta está en el draft pile
+    draft = Column(Boolean, default=False)
+    discardInt = Column(Integer, default=0)
 
 class Secrets(Base):
     __tablename__  = 'secrets'
