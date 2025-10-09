@@ -16,8 +16,16 @@ class ConnectionManagerLobby: # ESTE MANEJA LA LISTA DE PARTIDAS DISPONIBLES
         self.active_connections.remove(websocket)
 
     async def broadcast(self, message: str):
+        disconnected = []
         for connection in self.active_connections:
-            await connection.send_text(message)
+            try:
+                await connection.send_text(message)
+            except Exception:
+                # Si la conexión está cerrada, la marcamos para remover
+                disconnected.append(connection)
+        # Removemos las conexiones cerradas
+        for conn in disconnected:
+            await self.disconnect(conn)
 
     async def send_personal_message(self, message: str, websocket: WebSocket):
         await websocket.send_text(message)

@@ -14,13 +14,14 @@ class Game_Response (BaseModel) :
     min_players : int
     status : str 
     name : str
-    players_amount : int
-    
-    model_config = ConfigDict(from_attributes=True)    
+    players_amount : int  
+    players_amount : int  
+    current_turn : Optional[int] = None  
+    cards_left : Optional[int] = None
+    model_config = ConfigDict(from_attributes=True)  
 
 class Game_Initialized (BaseModel) : 
     game_id : int 
     status : str 
     name : str 
-    players_amount : int 
-    current_turn : int  
+    players_amount : int

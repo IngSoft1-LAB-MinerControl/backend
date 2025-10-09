@@ -56,15 +56,20 @@ async def delete_game(game_id: int, db:Session = Depends(get_db)):
 
 
 
-@game.post("/game/beginning/{game_id}", status_code = 202,response_model= Game_Initialized, tags = ["Games"] ) 
+@game.post("/game/beginning/{game_id}", status_code = 202,response_model= Game_Response, tags = ["Games"] ) 
 async def initialize_game (game_id : int, db : Session = Depends(get_db)):
     game = db.query(Game).where(Game.game_id == game_id).first()
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+    if game.status == "in course":
+        raise HTTPException(status_code=400, detail="Game already started")
     if game.players_amount >= game.min_players :  
         turns_assigned = assign_turn_to_players (game_id, db)
         cards_initialized = init_cards (game_id, db)
         secrets_initialized = init_secrets(game_id, db)
         cards_dealt = deal_cards_to_players (game_id, db)
         secrets_dealt = deal_secrets_to_players (game_id, db)
+        game.cards_left = 63 - (game.players_amount * 6)
         game.status = "in course"
         
         await broadcast_lobby_information(db, game_id)
