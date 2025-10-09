@@ -50,7 +50,7 @@ def delete_game(game_id: int, db:Session = Depends(get_db)):
 
 
 
-@game.post("/game/beginning/{game_id}", status_code = 202,response_model= Game_Initialized, tags = ["Games"] ) 
+@game.post("/game/beginning/{game_id}", status_code = 202,response_model= Game_Response, tags = ["Games"] ) 
 def initialize_game (game_id : int, db : Session = Depends(get_db)):
     game = db.query(Game).where(Game.game_id == game_id).first()
     if not game:
@@ -63,6 +63,7 @@ def initialize_game (game_id : int, db : Session = Depends(get_db)):
         secrets_initialized = init_secrets(game_id, db)
         cards_dealt = deal_cards_to_players (game_id, db)
         secrets_dealt = deal_secrets_to_players (game_id, db)
+        game.cards_left = 63 - (game.players_amount * 6)
         game.status = "in course"
         try:
             db.commit()

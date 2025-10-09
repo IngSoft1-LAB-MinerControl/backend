@@ -14,6 +14,7 @@ class Game(Base):
     min_players = Column(Integer, nullable=False)
     players_amount = Column(Integer,nullable = False)
     current_turn = Column(Integer, nullable = True)
+    cards_left = Column(Integer , nullable=True)
     players = relationship("Player", back_populates="game")
     cards = relationship("Card", back_populates="game")
     secrets = relationship("Secrets", back_populates="game")
