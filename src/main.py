@@ -3,6 +3,7 @@ from src.routes.players_routes import player
 from src.routes.games_routes import game
 from src.routes.cards_routes import card
 from src.routes.secrets_routes import secret
+from src.routes.websocket_routes import ws
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -25,7 +26,8 @@ app.add_middleware(
 @app.get("/")
 def hola() :
     return "Hola Mundo"
- 
+
+app.include_router(ws) 
 app.include_router(player)
 app.include_router(game)
 app.include_router(card)

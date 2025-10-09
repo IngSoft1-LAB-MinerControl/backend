@@ -1,3 +1,4 @@
+import json
 from fastapi import APIRouter, Depends, HTTPException, WebSocket  #te permite definir las rutas o subrutas por separado
 from sqlalchemy.orm import Session  
 from src.database.database import SessionLocal, get_db
@@ -6,29 +7,12 @@ from src.schemas.games_schemas import Game_Base, Game_Response, Game_Initialized
 from src.database.services.services_games import assign_turn_to_players
 from src.database.services.services_cards import init_cards, deal_cards_to_players
 from src.database.services.services_secrets import init_secrets, deal_secrets_to_players
-from src.database.services.services_websockets import broadcast_available_games
-from src.webSocket.connection_manager import manager  
+from src.database.services.services_websockets import broadcast_available_games, broadcast_lobby_information
+from src.webSocket.connection_manager import lobbyManager, gameManager
 
 
 game = APIRouter()
 
-
-
-@game.websocket("/ws/games/availables", name="ws_available_games")
-async def ws_available_games(websocket: WebSocket, db: Session = Depends(get_db)):
-    await manager.connect(websocket)
-    # Envía la lista actual de partidas tan pronto como el cliente se conecta
-    await broadcast_available_games(db)
-    try:
-        while True:
-            # Mantenemos la conexión abierta. 
-            # El receive_text es solo para detectar cuando el cliente se desconecta.
-            await websocket.receive_text()
-    except Exception:
-        # Cuando el cliente se desconecta, se lanza una excepción
-        manager.disconnect(websocket)
-        # Opcional: podrías notificar a los demás si fuera necesario, 
-        # pero para una lista de partidas no hace falta.
 
 @game.get("/games",tags = ["Games"])
 def list_games (db: Session = Depends(get_db)) :
@@ -73,7 +57,7 @@ async def delete_game(game_id: int, db:Session = Depends(get_db)):
 
 
 @game.post("/game/beginning/{game_id}", status_code = 202,response_model= Game_Initialized, tags = ["Games"] ) 
-def initialize_game (game_id : int, db : Session = Depends(get_db)):
+async def initialize_game (game_id : int, db : Session = Depends(get_db)):
     game = db.query(Game).where(Game.game_id == game_id).first()
     if game.players_amount >= game.min_players :  
         turns_assigned = assign_turn_to_players (game_id, db)
@@ -82,6 +66,8 @@ def initialize_game (game_id : int, db : Session = Depends(get_db)):
         cards_dealt = deal_cards_to_players (game_id, db)
         secrets_dealt = deal_secrets_to_players (game_id, db)
         game.status = "in course"
+        
+        await broadcast_lobby_information(db, game_id)
         try:
             db.commit()
         except Exception as e:
