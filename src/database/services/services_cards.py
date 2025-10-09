@@ -5,6 +5,42 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from src.database.models import Player, Card
 
+def setup_initial_draft_pile(game_id: int, db: Session):
+    """
+    Selecciona las primeras 3 cartas del mazo para formar el draft pile inicial.
+    """
+    deck = db.query(Card).filter(
+        Card.game_id == game_id, 
+        Card.player_id.is_(None),
+        Card.draft == False
+    ).limit(3).all()
+
+    if len(deck) < 3:
+        # No debería pasar en un juego nuevo, pero es una buena validación.
+        raise HTTPException(status_code=500, detail="Not enough cards in the deck to create the draft pile.")
+
+    for card in deck:
+        card.draft = True
+    
+    # El commit se hará en la ruta que llama a esta función.
+    return {"message": "Initial draft pile created successfully."}
+
+def replenish_draft_pile(game_id: int, db: Session):
+    """
+    Repone una carta en el draft pile desde el mazo principal.
+    """
+    new_draft_card = db.query(Card).filter(
+        Card.game_id == game_id,
+        Card.player_id.is_(None),
+        Card.draft == False
+    ).first()
+
+    if new_draft_card:
+        new_draft_card.draft = True
+    
+    # Si no hay cartas, el draft pile simplemente se achicará. No es un error.
+    return new_draft_card
+
 def deal_cards_to_players(game_id: int, db: Session):
     """
     Reparte 6 cartas aleatorias a cada jugador en una partida específica.
@@ -77,4 +113,3 @@ def only_6 (player_id , db: Session = Depends(get_db)):
         return True
     else:
         return False
-    

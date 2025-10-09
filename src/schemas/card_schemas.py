@@ -10,3 +10,4 @@ class Card_Response(BaseModel):
     type : str
     class config:
         orm_mode = True
+    draft: bool 

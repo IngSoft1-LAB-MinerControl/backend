@@ -77,3 +77,18 @@ def select_card_to_discard(player_id : int, card_id : int, db: Session = Depends
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Error assigning card to player: {str(e)}")
+    
+@card.get("/cards/draft/{game_id}", tags=["Cards"], response_model=list[Card_Response])
+def get_draft_pile(game_id: int, db: Session = Depends(get_db)):
+    """
+    Obtiene las cartas que están actualmente visibles en el draft pile de la mesa.
+    """
+    draft_cards = db.query(Card).filter(
+        Card.game_id == game_id,
+        Card.draft == True
+    ).all()
+
+    if not draft_cards:
+        raise HTTPException(status_code=404, detail="No cards found in the draft pile for this game.")
+    
+    return draft_cards
