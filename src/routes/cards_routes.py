@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, func  
 from src.database.database import SessionLocal, get_db
 from src.database.models import Card , Game
-from src.database.services.services_cards import only_6
+from src.database.services.services_cards import only_6, replenish_draft_pile
 from src.schemas.card_schemas import Card_Response
 from src.database.services.services_websockets import broadcast_last_discarted_cards
 import random
@@ -107,6 +107,26 @@ def get_draft_pile(game_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="No cards found in the draft pile for this game.")
     
     return draft_cards
+
+@card.put("/cards/draft_pickup/{game_id},{card_id},{player_id}", status_code=200, tags=["Cards"], response_model=Card_Response)
+def pick_up_draft_card(game_id: int, card_id: int, player_id: int, db: Session = Depends(get_db)):
+    card = db.query(Card).filter(Card.card_id == card_id, Card.game_id == game_id, Card.draft == True).first()
+    if not card:
+        raise HTTPException(status_code=404, detail="Card not found in draft pile.")
+    if only_6(player_id, db):
+        raise HTTPException(status_code=400, detail="The player already has 6 cards")    
+    try:
+        card.draft = False
+        card.player_id = player_id
+        card.picked_up=True
+        replenish_draft_pile(game_id, db)
+
+        db.commit()
+        db.refresh(card)
+        return card
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error picking up card: {str(e)}")
 
 @card.get("/cards/discard-pile/{game_id}", tags=["Cards"], response_model=list[Card_Response])
 def get_top_discard_pile(game_id: int, db: Session = Depends(get_db)):
