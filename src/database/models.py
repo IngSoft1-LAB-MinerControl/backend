@@ -44,6 +44,32 @@ class Card(Base):
     draft = Column(Boolean, default=False)
     discardInt = Column(Integer, default=0)
 
+    __mapper_args__ = {
+        'polymorphic_on': type,
+        'polymorphic_abstract': True  
+    }
+
+class Detective(Card):
+    __tablename__ ='detectives'
+    name = Column(String(30))
+    detective_id = Column(Integer, ForeignKey('cards.card_id'), primary_key=True)
+    quantity_set = Column(Integer)
+    set_id = Column(Integer , ForeignKey("sets.set_id"), nullable=True)
+    set = relationship("Set" , back_populates="detective")
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'detective'
+    }
+
+class Event(Card):
+    __tablename__ ='events'
+    name = Column(String(30))
+    event_id = Column(Integer, ForeignKey('cards.card_id'), primary_key=True)
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'event'
+    }
+
 class Secrets(Base):
     __tablename__  = 'secrets'
     secret_id = Column(Integer, primary_key=True, autoincrement=True)
@@ -56,6 +82,10 @@ class Secrets(Base):
     game = relationship("Game", back_populates="secrets")
 
     
-   
+class Set(Base):
+    __tablename__ = 'sets'
+    set_id = Column(Integer , primary_key=True , autoincrement=True)
+    name = Column(String(30))
+    detective = relationship("Detective" , back_populates="set")
 
 
