@@ -1,8 +1,10 @@
 from fastapi.encoders import jsonable_encoder
-from fastapi import WebSocket
+from fastapi import HTTPException, WebSocket
+from sqlalchemy import desc, true
 from sqlalchemy.orm import Session
+from src.schemas.card_schemas import Card_Response
 from src.database.database import SessionLocal
-from src.database.models import Game, Player
+from src.database.models import Game, Player, Card
 from src.schemas.games_schemas import Game_Response
 from src.webSocket.connection_manager import lobbyManager, gameManager
 from src.schemas.players_schemas import Player_Base, Player_State
@@ -80,5 +82,26 @@ async def broadcast_game_information ( game_id : int) :
     }), game_id)
         
         
-      
+async def broadcast_last_discarted_cards(player_id : int) : 
+    db = SessionLocal() 
+    player = db.query(Player).filter(Player.player_id == player_id).first()
+    game_id = player.game_id
+    cardsDropped = db.query(Card).filter(
+        Card.game_id == game_id,
+        Card.dropped == True
+    ).order_by(desc(Card.discardInt)).limit(5).all()
+    if not cardsDropped:
+        raise HTTPException(status_code=404, detail="No cards found in the discard pile for this game.")
+    cardsDroppedResponse = [Card_Response.model_validate(card) for card in cardsDropped]
+    cardsResponseJson = jsonable_encoder(cardsDroppedResponse)
+    await gameManager.broadcast(json.dumps({
+        "type": "droppedCards",
+        "data": cardsResponseJson
+    }), game_id)
+    
+
+
+
+
+         
     

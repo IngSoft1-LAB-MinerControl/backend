@@ -82,6 +82,7 @@ async def initialize_game (game_id : int, db : Session = Depends(get_db)):
             raise HTTPException(status_code=400, detail=f"Error updating turn's game: {str(e)}")
         
         await broadcast_game_information(game_id)
+        await broadcast_available_games(db)
     else : 
         raise HTTPException(status_code=424, detail=f"Error, you need more players to start game")
     return game

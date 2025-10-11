@@ -28,7 +28,7 @@ class Player(Base):
     turn_order = Column(Integer) # Posición del jugador en el turno
     game_id = Column(Integer, ForeignKey("games.game_id"), nullable=False)  
     game = relationship("Game", back_populates="players")
-    cards = relationship("Card", back_populates="player")
+    cards = relationship("Card",primaryjoin="and_(Card.player_id == Player.player_id, Card.dropped == False)", back_populates="player")
     secrets = relationship("Secrets", back_populates="player")
 
 class Card(Base):

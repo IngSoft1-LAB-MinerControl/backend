@@ -5,6 +5,7 @@ from src.database.database import SessionLocal, get_db
 from src.database.models import Card , Game
 from src.database.services.services_cards import only_6
 from src.schemas.card_schemas import Card_Response
+from src.database.services.services_websockets import broadcast_last_discarted_cards
 import random
 
 card = APIRouter()
@@ -50,7 +51,7 @@ def pickup_a_card(player_id: int, game_id: int, db: Session = Depends(get_db)):
 
 
 @card.put("/cards/drop/{player_id}" , status_code=200, tags = ["Cards"], response_model=Card_Response)
-def discard_card(player_id : int , db: Session = Depends(get_db)):
+async def discard_card(player_id : int , db: Session = Depends(get_db)):
     card = db.query(Card).filter(Card.player_id == player_id , Card.dropped == False).first()
     if not card:
         raise HTTPException(status_code=404, detail="All cards dropped")       
@@ -65,6 +66,7 @@ def discard_card(player_id : int , db: Session = Depends(get_db)):
         card.picked_up = False
         db.commit()
         db.refresh(card)
+        await broadcast_last_discarted_cards(player_id)
         return card
     except Exception as e:
         db.rollback()
