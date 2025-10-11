@@ -13,3 +13,14 @@ class Card_Response(BaseModel):
     class config:
         orm_mode = True
     model_config = ConfigDict(from_attributes=True)    
+
+class Detective_Response(Card_Response): 
+    name : str
+    detective_id : int
+    quantity_set : int
+    set_id : Optional[int] = None
+
+class Event_Response(Card_Response): 
+    name : str
+    event_id : int
+   

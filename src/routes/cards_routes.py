@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func  
 from src.database.database import SessionLocal, get_db
-from src.database.models import Card , Game
+from src.database.models import Card , Game , Detective , Event
 from src.database.services.services_cards import only_6
-from src.schemas.card_schemas import Card_Response
+from src.schemas.card_schemas import Card_Response , Detective_Response , Event_Response
 from src.database.services.services_websockets import broadcast_last_discarted_cards
 import random
 
@@ -20,6 +20,20 @@ def list_cards_ingame(game_id: int, db: Session = Depends(get_db)):
 @card.get("/lobby/list/cards/{player_id}", tags=["Cards"], response_model=list[Card_Response])
 def list_card_ofplayer(player_id: int, db: Session = Depends(get_db)):
     cards = db.query(Card).filter(Card.player_id == player_id, Card.dropped == False).all()
+    if not cards:
+        raise HTTPException(status_code=404, detail="No cards found for the given player_id")
+    return cards
+
+@card.get("/lobby/list/detectives/{player_id}", tags=["Cards"], response_model=list[Detective_Response])
+def list_detectives_ofplayer(player_id: int, db: Session = Depends(get_db)):
+    cards = db.query(Detective).filter(Detective.player_id == player_id, Detective.dropped == False).all()
+    if not cards:
+        raise HTTPException(status_code=404, detail="No cards found for the given player_id")
+    return cards
+
+@card.get("/lobby/list/events/{player_id}", tags=["Cards"], response_model=list[Event_Response])
+def list_events_ofplayer(player_id: int, db: Session = Depends(get_db)):
+    cards = db.query(Event).filter(Event.player_id == player_id, Event.dropped == False).all()
     if not cards:
         raise HTTPException(status_code=404, detail="No cards found for the given player_id")
     return cards
@@ -40,7 +54,7 @@ def pickup_a_card(player_id: int, game_id: int, db: Session = Depends(get_db)):
     try:
         card.picked_up = True
         card.player_id = player_id
-        game.cards_left = game.cards_left - 1
+        game.cards_left = len(deck) -1
         db.commit()
         db.refresh(card)
         db.refresh(game)
