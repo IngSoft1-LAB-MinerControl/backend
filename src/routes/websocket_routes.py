@@ -6,7 +6,7 @@ from src.schemas.games_schemas import Game_Response
 from src.schemas.players_schemas import Player_Base
 from src.database.models import Game, Player
 from src.database.database import get_db
-from src.database.services.services_websockets import broadcast_available_games, broadcast_lobby_information
+from src.database.services.services_websockets import broadcast_available_games, broadcast_lobby_information, broadcast_game_information
 from src.webSocket.connection_manager import lobbyManager , gameManager
 
 ws = APIRouter()
@@ -51,3 +51,24 @@ async def ws_list_players(websocket : WebSocket,game_id : int ,db:Session = Depe
         # Nos aseguramos de desconectar al cliente del canal de la partida.
         gameManager.disconnect(websocket, game_id)
       
+@ws.websocket("/ws/game/{game_id}", name = "Info from game")
+async def ws_info_from_game(websocket : WebSocket, game_id : int, db : Session =Depends(get_db)) :
+    game = db.query(Game).filter(Game.game_id == game_id).first() # .all() me devuelve una lista, si no hay nada devuelve lista vacia
+    if not game:
+        await websocket.close(code=4004, reason="Game not found")
+        return 
+    await gameManager.connect(websocket, game_id)
+    
+    try : 
+        await broadcast_game_information( game_id)
+        
+        while True:
+            # Mantenemos la conexión abierta para detectar cuando el cliente se va.
+            await websocket.receive_text()
+
+    except Exception:
+        # Esta parte se ejecuta si el cliente cierra la pestaña o pierde la conexión.
+        pass
+    finally:
+        # Nos aseguramos de desconectar al cliente del canal de la partida.
+        gameManager.disconnect(websocket, game_id)

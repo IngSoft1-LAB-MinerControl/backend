@@ -1,12 +1,13 @@
 from fastapi.encoders import jsonable_encoder
 from fastapi import WebSocket
 from sqlalchemy.orm import Session
+from src.database.database import SessionLocal
 from src.database.models import Game, Player
 from src.schemas.games_schemas import Game_Response
 from src.webSocket.connection_manager import lobbyManager, gameManager
-from src.schemas.players_schemas import Player_Base
+from src.schemas.players_schemas import Player_Base, Player_State
 import json 
-
+from sqlalchemy.orm import joinedload
 
 async def broadcast_available_games(db: Session):
     """
@@ -50,6 +51,32 @@ async def broadcast_lobby_information (db:Session, game_id : int) :
     await gameManager.broadcast(json.dumps({
         "type": "players",
         "data": playersResponseJson
+    }), game_id)
+
+async def broadcast_game_information ( game_id : int) :
+    db = SessionLocal()
+    
+    game = db.query(Game).filter(Game.game_id == game_id).first()
+    if not game:
+        # Si el juego ya no existe, no hacemos nada.
+        print(f"Intento de broadcast para un juego no existente: {game_id}")
+        return
+    
+    players = db.query(Player).options(
+                        joinedload(Player.cards),joinedload(Player.secrets)).filter(Player.game_id == game_id).all()
+    
+    gameResponse = Game_Response.model_validate(game).model_dump_json()
+    playersStateResponse = [Player_State.model_validate(player) for player in players]
+    playersStateResponseJson = jsonable_encoder(playersStateResponse)
+
+    await gameManager.broadcast(json.dumps({
+        "type": "gameUpdated",
+        "data": gameResponse
+    }), game_id)
+
+    await gameManager.broadcast(json.dumps({
+        "type": "playersState",
+        "data": playersStateResponseJson
     }), game_id)
         
         

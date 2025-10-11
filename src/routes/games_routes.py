@@ -7,7 +7,7 @@ from src.schemas.games_schemas import Game_Base, Game_Response, Game_Initialized
 from src.database.services.services_games import assign_turn_to_players
 from src.database.services.services_cards import init_cards, deal_cards_to_players
 from src.database.services.services_secrets import init_secrets, deal_secrets_to_players
-from src.database.services.services_websockets import broadcast_available_games, broadcast_lobby_information
+from src.database.services.services_websockets import broadcast_available_games, broadcast_game_information
 from src.webSocket.connection_manager import lobbyManager, gameManager
 
 
@@ -72,18 +72,22 @@ async def initialize_game (game_id : int, db : Session = Depends(get_db)):
         game.cards_left = 63 - (game.players_amount * 6)
         game.status = "in course"
         
-        await broadcast_lobby_information(db, game_id)
         try:
             db.commit()
+            db.refresh(game)
+            
         except Exception as e:
             db.rollback()
             raise HTTPException(status_code=400, detail=f"Error updating turn's game: {str(e)}")
+        
+        await broadcast_game_information(game_id)
     else : 
         raise HTTPException(status_code=424, detail=f"Error, you need more players to start game")
     return game
 
+
 @game.put ("/game/update_turn/{game_id}", status_code = 202, tags = ["Games"])
-def update_turn (game_id : int , db: Session = Depends(get_db)) : 
+async def update_turn (game_id : int , db: Session = Depends(get_db)) : 
     game = db.query(Game).where(Game.game_id == game_id).first()
     if game.current_turn < game.players_amount : 
         game.current_turn += 1 
@@ -91,6 +95,7 @@ def update_turn (game_id : int , db: Session = Depends(get_db)) :
         game.current_turn = 1
     try:
         db.commit()
+        await broadcast_game_information(game_id)
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Error updating turn's game: {str(e)}")
