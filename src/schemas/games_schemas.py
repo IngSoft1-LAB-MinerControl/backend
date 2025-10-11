@@ -15,7 +15,6 @@ class Game_Response (BaseModel) :
     status : str 
     name : str
     players_amount : int  
-    players_amount : int  
     current_turn : Optional[int] = None  
     cards_left : Optional[int] = None
     model_config = ConfigDict(from_attributes=True)  

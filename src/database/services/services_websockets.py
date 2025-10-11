@@ -15,9 +15,11 @@ async def broadcast_available_games(db: Session):
     """
     Obtiene las partidas disponibles y las envía a todos los clientes conectados.
     """
-    games = db.query(Game).filter(
-        (Game.status == "bootable") | (Game.status == "waiting players")
-    ).all()
+    #games = db.query(Game).filter(
+    #   (Game.status == "bootable") | (Game.status == "waiting players")
+    #).all()
+
+    games = db.query(Game).all()
     
     # 2. Conviertes cada objeto ORM a un objeto Pydantic Game_Response
     # Pydantic leerá los atributos (game.name, game.status, etc.) automáticamente
