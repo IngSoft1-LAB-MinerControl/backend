@@ -13,13 +13,10 @@ def setup_initial_draft_pile(game_id: int, db: Session):
         Card.game_id == game_id, 
         Card.player_id.is_(None),
         Card.draft == False
-    ).limit(3).all()
+    ).all()
+    random.shuffle(deck)
 
-    if len(deck) < 3:
-        # No debería pasar en un juego nuevo, pero es una buena validación.
-        raise HTTPException(status_code=500, detail="Not enough cards in the deck to create the draft pile.")
-
-    for card in deck:
+    for card in deck[:3]: # solo lo hace 3 veces 
         card.draft = True
     
     # El commit se hará en la ruta que llama a esta función.
@@ -29,17 +26,17 @@ def replenish_draft_pile(game_id: int, db: Session):
     """
     Repone una carta en el draft pile desde el mazo principal.
     """
-    new_draft_card = db.query(Card).filter(
+    deck = db.query(Card).filter(
         Card.game_id == game_id,
         Card.player_id.is_(None),
         Card.draft == False
-    ).first()
+    ).all()
+    random.shuffle(deck)
 
-    if new_draft_card:
-        new_draft_card.draft = True
-    
+    deck[0].draft = True
+
     # Si no hay cartas, el draft pile simplemente se achicará. No es un error.
-    return new_draft_card
+    return deck[0] if deck else None
 
 def deal_cards_to_players(game_id: int, db: Session):
     """
@@ -51,9 +48,6 @@ def deal_cards_to_players(game_id: int, db: Session):
 
     # Obtener todas las cartas disponibles (las que no tienen un player_id asignado).
     deck = db.query(Card).filter(Card.game_id == game_id, Card.player_id == None).all()
-    if len(deck) < 55: 
-        raise HTTPException(status_code=400, detail="las cartas ya han sido repartidas en esta partida.")
-
     # se supone que esto se llama cuando arranca la partida asiq todo va a estar en None
 
     #se podria chequear con la cantidad de cartas y ver que el tamano de la lista 
