@@ -82,7 +82,28 @@ async def broadcast_game_information ( game_id : int) :
         "type": "playersState",
         "data": playersStateResponseJson
     }), game_id)
-        
+
+async def broadcast_player_state(game_id: int):
+    """
+    Obtiene el estado completo de los jugadores (incluyendo manos) y lo emite a la partida.
+    """
+    db = SessionLocal() # Abre una nueva sesión para esta función
+    
+    # Obtiene todos los jugadores y sus cartas (manos)
+    players = db.query(Player).options(
+                        joinedload(Player.cards),joinedload(Player.secrets)).filter(Player.game_id == game_id).all()
+    
+    # Convierte a Pydantic Player_State
+    playersStateResponse = [Player_State.model_validate(player) for player in players]
+    playersStateResponseJson = jsonable_encoder(playersStateResponse)
+
+    # Emite el WS de "playersState"
+    await gameManager.broadcast(json.dumps({
+        "type": "playersState",
+        "data": playersStateResponseJson
+    }), game_id)
+
+
         
 async def broadcast_last_discarted_cards(player_id : int) : 
     db = SessionLocal() 
