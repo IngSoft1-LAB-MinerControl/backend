@@ -192,6 +192,7 @@ async def select_cards_to_discard(player_id: int, discard_request: Discard_List_
             card_obj.dropped = True
             card_obj.picked_up = False
             updated_cards.append(card_obj)
+            next_discard_int += 1
         
         db.commit()
 
