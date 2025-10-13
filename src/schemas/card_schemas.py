@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict
-from typing import Optional 
+from typing import Optional, Union 
 
 class Card_Response(BaseModel): 
     card_id : int
@@ -16,11 +16,19 @@ class Card_Response(BaseModel):
 
 class Detective_Response(Card_Response): 
     name : str
-    detective_id : int
     quantity_set : int
     set_id : Optional[int] = None
+    class config:
+        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)    
 
 class Event_Response(Card_Response): 
     name : str
-    event_id : int
+    class config:
+        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)    
+
+AllCardsResponse = Union[Detective_Response, Event_Response]
+
+
    

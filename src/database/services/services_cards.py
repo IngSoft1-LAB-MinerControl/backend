@@ -51,8 +51,7 @@ def deal_cards_to_players(game_id: int, db: Session):
 
     # Obtener todas las cartas disponibles (las que no tienen un player_id asignado).
     deck = db.query(Card).filter(Card.game_id == game_id, Card.player_id == None).all()
-    if len(deck) < 55: 
-        raise HTTPException(status_code=400, detail="las cartas ya han sido repartidas en esta partida.")
+
 
     # se supone que esto se llama cuando arranca la partida asiq todo va a estar en None
 
