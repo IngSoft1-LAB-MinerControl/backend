@@ -6,35 +6,40 @@ import random
 
 def deal_secrets_to_players(game_id: int, db: Session):
     """
-    Reparte 3 secretos aleatorios a cada jugador en una partida específica.
+    Reparte 3 secretos aleatorios a cada jugador, reintentando si el Asesino y
+    el Cómplice son el mismo jugador.
     """
-    # Obtener todos los jugadores de la partida.
     players = db.query(Player).filter(Player.game_id == game_id).all()
     num_players = len(players)
+    secrets_deck = db.query(Secrets).filter(Secrets.game_id == game_id, Secrets.player_id.is_(None)).all()
 
-    # Obtener todos los secretos disponibles (las que no tienen un player_id asignado).
-    secrets_deck = db.query(Secrets).filter(Secrets.game_id == game_id, Secrets.player_id == None).all()
-    if len(secrets_deck) < num_players * 3: 
-        raise HTTPException(status_code=400, detail="los secretos ya han sido repartidas en esta partida.")
+    if len(secrets_deck) < num_players * 3:
+        raise HTTPException(status_code=400, detail="No hay suficientes secretos para repartir o ya fueron repartidos.")
 
-    # se supone que esto se llama cuando arranca la partida asiq todo va a estar en None
+    while True:
+        # 1. Barajar las cartas en cada intento
+        random.shuffle(secrets_deck)
 
-    #se podria chequear con la cantidad de cartas y ver que el tamano de la lista 
-    # y cartas sea la misma, sino error
-
-    # barajar las cartas 
-    random.shuffle(secrets_deck)
-
-    try:
-        # Asignar 3 secretos a cada jugador.
+        # 2. Asignar 3 secretos a cada jugador
         secret_cursor = 0
         for player in players:
-            for _ in range(3): # Repartir 3 secretos
+            for _ in range(3):
                 secret_to_deal = secrets_deck[secret_cursor]
-                # Asignar el secreto al jugador (asignar un secreto es cambiarle el player_id y poner picked_up en True)
                 secret_to_deal.player_id = player.player_id
                 secret_cursor += 1
-        # Confirmar todos los cambios en la base de datos
+
+        # 3. Comprobar la condición
+        murderer_card = next((s for s in secrets_deck if s.murderer), None)
+        acomplice_card = next((s for s in secrets_deck if s.acomplice), None)
+
+        # Si no hay cómplice o si los dueños son diferentes, la repartición es válida
+        if not acomplice_card or (acomplice_card.player_id != murderer_card.player_id):
+            break  # Salir del bucle while
+
+        # Si la condición no se cumple, el bucle se repetirá, volviendo a barajar y asignar.
+
+    try:
+        # 4. Confirmar los cambios en la base de datos una vez que la repartición es válida
         db.commit()
     except Exception as e:
         db.rollback()
@@ -47,14 +52,24 @@ def init_secrets(game_id : int , db: Session = Depends(get_db)):
     players = db.query(Player).filter(Player.game_id == game_id).all()
     num_players = len(players)
 
-    for _ in range(num_players*3): 
+    cards_to_create = num_players * 3 - 1 # una carta es la del asesino
+    # Cada jugador recibe 3 secretos, por lo que se crean 3 * número de jugadores
+    if num_players > 4: 
+        cards_to_create = cards_to_create - 1 # si hay mas de 4 jugadores un secreto va a ser el del complice
+        acomplice_card = Secrets(murderer=False, acomplice=True, revelated=False, player_id=None, game_id=game_id)
+        new_secret_list.append(acomplice_card)
+    # 
+    murderer_card = Secrets(murderer=True, acomplice=False, revelated=False, player_id=None, game_id=game_id)
+    new_secret_list.append(murderer_card)
+
+    for _ in range(cards_to_create):
         new_secret = Secrets(murderer = False ,
                             acomplice = False ,
                             revelated = False ,
                             player_id = None,
                             game_id= game_id)
         new_secret_list.append(new_secret)
-
+    
     try:
         db.add_all(new_secret_list)
         db.commit()
@@ -62,4 +77,4 @@ def init_secrets(game_id : int , db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Error creating cards: {str(e)}")
 
-    return {"message": f"{num_players*3} secrets created successfully"}
+    return {"message": f"{len(new_secret_list)} secrets created successfully"}

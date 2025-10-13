@@ -15,9 +15,11 @@ async def broadcast_available_games(db: Session):
     """
     Obtiene las partidas disponibles y las envía a todos los clientes conectados.
     """
-    games = db.query(Game).filter(
-        (Game.status == "bootable") | (Game.status == "waiting players")
-    ).all()
+    #games = db.query(Game).filter(
+    #   (Game.status == "bootable") | (Game.status == "waiting players")
+    #).all()
+
+    games = db.query(Game).all()
     
     # 2. Conviertes cada objeto ORM a un objeto Pydantic Game_Response
     # Pydantic leerá los atributos (game.name, game.status, etc.) automáticamente
@@ -80,7 +82,28 @@ async def broadcast_game_information ( game_id : int) :
         "type": "playersState",
         "data": playersStateResponseJson
     }), game_id)
-        
+
+async def broadcast_player_state(game_id: int):
+    """
+    Obtiene el estado completo de los jugadores (incluyendo manos) y lo emite a la partida.
+    """
+    db = SessionLocal() # Abre una nueva sesión para esta función
+    
+    # Obtiene todos los jugadores y sus cartas (manos)
+    players = db.query(Player).options(
+                        joinedload(Player.cards),joinedload(Player.secrets)).filter(Player.game_id == game_id).all()
+    
+    # Convierte a Pydantic Player_State
+    playersStateResponse = [Player_State.model_validate(player) for player in players]
+    playersStateResponseJson = jsonable_encoder(playersStateResponse)
+
+    # Emite el WS de "playersState"
+    await gameManager.broadcast(json.dumps({
+        "type": "playersState",
+        "data": playersStateResponseJson
+    }), game_id)
+
+
         
 async def broadcast_last_discarted_cards(player_id : int) : 
     db = SessionLocal() 
@@ -92,6 +115,17 @@ async def broadcast_last_discarted_cards(player_id : int) :
     ).order_by(desc(Card.discardInt)).limit(5).all()
     if not cardsDropped:
         raise HTTPException(status_code=404, detail="No cards found in the discard pile for this game.")
+    
+    #Actualizo la mano del jugador tambien
+    players = db.query(Player).options(
+                        joinedload(Player.cards),joinedload(Player.secrets)).filter(Player.game_id == game_id).all()
+    playersStateResponse = [Player_State.model_validate(player) for player in players]
+    playersStateResponseJson = jsonable_encoder(playersStateResponse)
+    await gameManager.broadcast(json.dumps({
+        "type": "playersState",
+        "data": playersStateResponseJson
+    }), game_id)
+    
     cardsDroppedResponse = [Card_Response.model_validate(card) for card in cardsDropped]
     cardsResponseJson = jsonable_encoder(cardsDroppedResponse)
     await gameManager.broadcast(json.dumps({

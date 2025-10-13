@@ -32,3 +32,11 @@ AllCardsResponse = Union[Detective_Response, Event_Response]
 
 
    
+class Discard_List_Request(BaseModel):
+    #Esquema para recibir una lista de IDs de cartas a descartar
+    card_ids: list[int]
+
+    # Puedes agregar model_config si quieres seguir el estilo de pydantic v2
+    class config:
+        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
