@@ -1,4 +1,4 @@
-from fastapi import Depends
+from fastapi import Depends, HTTPException
 from sqlalchemy import extract
 from sqlalchemy.orm import Session  
 from src.database.database import SessionLocal, get_db
@@ -77,6 +77,21 @@ def assign_turn_to_players (game_id : int, db :Session = Depends (get_db)) :
         raise HTTPException(status_code=400, detail=f"Error setting current turn in game: {str(e)}") 
     return game
 
+
+def finish_game (game_id : int , db : Session = Depends(get_db)) : 
+    game = db.query(Game).where(Game.game_id == game_id).first()
+    if game.status != 'finished' : 
+        game.status = 'finished'
+        db.add(game)
+        try:
+            db.commit()
+            db.refresh(game)
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=400, detail=f"Error finishing the game: {str(e)}")  
+        return {"message": f"Game {game_id} finished successfully."}
+    else : 
+        return {"message": f"Game {game_id} is already finished."}
 
 
 

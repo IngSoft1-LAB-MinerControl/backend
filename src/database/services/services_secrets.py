@@ -4,6 +4,8 @@ from src.database.database import SessionLocal, get_db
 from src.database.models import Secrets, Player
 import random
 
+from src.database.services.services_games import finish_game
+
 def deal_secrets_to_players(game_id: int, db: Session):
     """
     Reparte 3 secretos aleatorios a cada jugador, reintentando si el Asesino y
@@ -78,3 +80,43 @@ def init_secrets(game_id : int , db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=f"Error creating cards: {str(e)}")
 
     return {"message": f"{len(new_secret_list)} secrets created successfully"}
+
+
+def reveal_secret(game_id: int, player_id: int, secret_id: int, db: Session):
+    secret = db.query(Secrets).filter(Secrets.game_id == game_id, Secrets.player_id == player_id, Secrets.secret_id == secret_id).first()
+    if not secret:
+        raise HTTPException(status_code=404, detail="Secret not found")
+    if secret.revelated:
+        raise HTTPException(status_code=400, detail="Secret is already revealed")
+
+    secret.revelated = True
+    if secret.murderer:
+        # Si es la carta del asesino, se termina el juego
+        finish_game(game_id, db)
+
+    db.commit()
+    db.refresh(secret)
+    return secret
+
+def hide_secret(game_id: int, player_id: int, secret_id: int, db: Session):
+    secret = db.query(Secrets).filter(Secrets.game_id == game_id, Secrets.player_id == player_id, Secrets.secret_id == secret_id).first()
+    if not secret:
+        raise HTTPException(status_code=404, detail="Secret not found")
+    if not secret.revelated:
+        raise HTTPException(status_code=400, detail="Secret is not revealed")
+    secret.revelated = False
+    db.commit()
+    db.refresh(secret)
+    return secret
+
+def steal_secret(game_id: int, player_id: int, target_player_id: int, secret_id: int, db: Session):
+    secret = db.query(Secrets).filter(Secrets.game_id == game_id, Secrets.player_id == player_id, Secrets.secret_id == secret_id).first()
+    if not secret:
+        raise HTTPException(status_code=404, detail="Secret not found")
+    
+    secret.player_id = target_player_id
+    hide_secret(game_id=game_id, player_id=player_id, secret_id=secret_id, db=db) # al robarlo se oculta automaticamente
+
+    db.commit()
+    db.refresh(secret)
+    return secret

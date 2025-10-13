@@ -4,8 +4,9 @@ from sqlalchemy import desc, func
 from src.database.database import SessionLocal, get_db
 from src.database.models import Card , Game
 from src.database.services.services_cards import only_6, replenish_draft_pile
-from src.schemas.card_schemas import Card_Response, Discard_List_Request
-from src.database.services.services_websockets import broadcast_game_information, broadcast_last_discarted_cards, broadcast_player_state
+from src.database.services.services_games import finish_game
+from src.schemas.card_schemas import Card_Response
+from src.database.services.services_websockets import broadcast_last_discarted_cards
 import random
 
 card = APIRouter()
@@ -24,17 +25,19 @@ def list_card_ofplayer(player_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="No cards found for the given player_id")
     return cards
 
-@card.put("/cards/pick_up/{player_id},{game_id}", status_code=200, tags=["Cards"], response_model=Card_Response)
-async def pickup_a_card(player_id: int, game_id: int, db: Session = Depends(get_db)):
+@card.put("/cards/pick_up/{player_id}/{game_id}", status_code=200, tags=["Cards"], response_model=Card_Response)
+def pickup_a_card(player_id: int, game_id: int, db: Session = Depends(get_db)):
     has_6_cards = only_6(player_id, db)
     if has_6_cards:
         raise HTTPException(status_code=400, detail="The player already has 6 cards")
     deck = db.query(Card).filter(Card.game_id == game_id, Card.player_id == None).all()
     game = db.query(Game).filter(Game.game_id == game_id).first()
     random.shuffle(deck)
-    if not deck:
+    if not deck: 
+        finish_game(game_id, db)
         raise HTTPException(status_code=404, detail="Game finished")
     if game.cards_left is None:
+        finish_game(game_id, db)
         raise HTTPException(status_code=404, detail="Game finished")
     card = deck[0]
     try:
@@ -44,7 +47,6 @@ async def pickup_a_card(player_id: int, game_id: int, db: Session = Depends(get_
         db.commit()
         db.refresh(card)
         db.refresh(game)
-        await broadcast_game_information(game_id)
         return card
     except Exception as e:
         db.rollback()
@@ -73,7 +75,7 @@ async def discard_card(player_id : int , db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Error assigning card to player: {str(e)}")
     
-@card.put("/cards/game/drop/{player_id},{card_id}", status_code= 200 , tags = ["Cards"], response_model= Card_Response)
+@card.put("/cards/game/drop/{player_id}/{card_id}", status_code= 200 , tags = ["Cards"], response_model= Card_Response)
 def select_card_to_discard(player_id : int, card_id : int, db: Session = Depends (get_db)) : 
     card = db.query(Card).filter(Card.player_id == player_id , Card.dropped == False, Card.card_id == card_id).first()
     if not card:
@@ -109,7 +111,7 @@ def get_draft_pile(game_id: int, db: Session = Depends(get_db)):
     
     return draft_cards
 
-@card.put("/cards/draft_pickup/{game_id},{card_id},{player_id}", status_code=200, tags=["Cards"], response_model=Card_Response)
+@card.put("/cards/draft_pickup/{game_id}/{card_id}/{player_id}", status_code=200, tags=["Cards"], response_model=Card_Response)
 def pick_up_draft_card(game_id: int, card_id: int, player_id: int, db: Session = Depends(get_db)):
     card = db.query(Card).filter(Card.card_id == card_id, Card.game_id == game_id, Card.draft == True).first()
     if not card:
@@ -143,55 +145,3 @@ def get_top_discard_pile(game_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="No cards found in the discard pile for this game.")
     
     return discarded_cards
-@card.put("/cards/game/drop_list/{player_id}" , status_code=200, tags = ["Cards"], response_model=list[Card_Response])
-async def select_cards_to_discard(player_id: int, discard_request: Discard_List_Request, db: Session = Depends(get_db)):
-    card_ids = discard_request.card_ids
-    
-    if not card_ids:
-        raise HTTPException(status_code=400, detail="Se requiere una lista de IDs de cartas.")
-
-    # Se buscan todas las cartas que el jugador quiere descartar
-    cards_to_discard = db.query(Card).filter(
-        Card.player_id == player_id,
-        Card.dropped == False,
-        Card.card_id.in_(card_ids)
-    ).all()
-    
-    # validación
-    if len(cards_to_discard) != len(card_ids):
-        # Esto indica que una o más de las cartas en la lista no cumplían los filtros
-        raise HTTPException(
-            status_code=403, 
-            detail="Una o más cartas seleccionadas no están en la mano del jugador o ya fueron descartadas."
-        )
-
-    try:
-        # 3. ENCONTRAR EL MÁXIMO discardInt
-        max_discard = db.query(func.max(Card.discardInt)).filter(Card.game_id == cards_to_discard[0].game_id).scalar()
-        next_discard_int = (max_discard or 0) + 1
-        
-        updated_cards = []
-
-        # 4. ITERAR Y ACTUALIZAR
-        for card_obj in cards_to_discard:
-            card_obj.discardInt = next_discard_int
-            card_obj.dropped = True
-            card_obj.picked_up = False
-            updated_cards.append(card_obj)
-        
-        db.commit()
-
-        # 5. REFRESCAR Y RETORNAR (Uniformidad: refrescamos los objetos)
-        # Refrescamos los objetos para asegurarnos de que el ORM tenga los valores correctos
-        for card_obj in updated_cards:
-             db.refresh(card_obj)
-
-        # 6. BROADCAST (La parte clave para que desaparezcan del frontend)
-        await broadcast_last_discarted_cards(player_id)
-        
-        return updated_cards
-        
-    except Exception as e:
-        db.rollback()
-        # Puedes añadir un manejo de HTTPException para uniformidad si no lo hiciste en el paso 2
-        raise HTTPException(status_code=500, detail=f"Error al descartar cartas seleccionadas: {str(e)}")
