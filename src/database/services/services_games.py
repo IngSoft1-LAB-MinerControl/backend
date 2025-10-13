@@ -1,4 +1,4 @@
-from fastapi import Depends
+from fastapi import Depends , HTTPException
 from sqlalchemy import extract
 from sqlalchemy.orm import Session  
 from src.database.database import SessionLocal, get_db

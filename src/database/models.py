@@ -18,6 +18,8 @@ class Game(Base):
     players = relationship("Player", back_populates="game")
     cards = relationship("Card", back_populates="game")
     secrets = relationship("Secrets", back_populates="game")
+    sets = relationship("Set" , back_populates="game")
+
 
 class Player(Base):
     __tablename__ = 'players'
@@ -30,6 +32,7 @@ class Player(Base):
     game = relationship("Game", back_populates="players")
     cards = relationship("Card",primaryjoin="and_(Card.player_id == Player.player_id, Card.dropped == False)", back_populates="player")
     secrets = relationship("Secrets", back_populates="player")
+    sets = relationship("Set" , back_populates="player")
 
 class Card(Base):
     __tablename__ = 'cards'
@@ -52,7 +55,7 @@ class Card(Base):
 class Detective(Card):
     __tablename__ ='detectives'
     name = Column(String(30))
-    detective_id = Column(Integer, ForeignKey('cards.card_id'), primary_key=True)
+    card_id = Column(Integer, ForeignKey('cards.card_id'), primary_key=True)
     quantity_set = Column(Integer)
     set_id = Column(Integer , ForeignKey("sets.set_id"), nullable=True)
     set = relationship("Set" , back_populates="detective")
@@ -64,7 +67,7 @@ class Detective(Card):
 class Event(Card):
     __tablename__ ='events'
     name = Column(String(30))
-    event_id = Column(Integer, ForeignKey('cards.card_id'), primary_key=True)
+    card_id = Column(Integer, ForeignKey('cards.card_id'), primary_key=True)
 
     __mapper_args__ = {
         'polymorphic_identity': 'event'
@@ -86,6 +89,10 @@ class Set(Base):
     __tablename__ = 'sets'
     set_id = Column(Integer , primary_key=True , autoincrement=True)
     name = Column(String(30))
+    player_id = Column(Integer, ForeignKey("players.player_id"), nullable=True)  
+    player = relationship("Player", back_populates="sets")   
+    game_id = Column(Integer, ForeignKey("games.game_id"), nullable=False)  
+    game = relationship("Game", back_populates="sets")
     detective = relationship("Detective" , back_populates="set")
 
 
