@@ -18,6 +18,8 @@ class Game(Base):
     players = relationship("Player", back_populates="game")
     cards = relationship("Card", back_populates="game")
     secrets = relationship("Secrets", back_populates="game")
+    sets = relationship("Set" , back_populates="game")
+
 
 class Player(Base):
     __tablename__ = 'players'
@@ -30,6 +32,7 @@ class Player(Base):
     game = relationship("Game", back_populates="players")
     cards = relationship("Card",primaryjoin="and_(Card.player_id == Player.player_id, Card.dropped == False)", back_populates="player")
     secrets = relationship("Secrets", back_populates="player")
+    sets = relationship("Set" , back_populates="player")
 
 class Card(Base):
     __tablename__ = 'cards'
@@ -44,6 +47,32 @@ class Card(Base):
     draft = Column(Boolean, default=False)
     discardInt = Column(Integer, default=0)
 
+    __mapper_args__ = {
+        'polymorphic_on': type,
+        'polymorphic_abstract': True  
+    }
+
+class Detective(Card):
+    __tablename__ ='detectives'
+    name = Column(String(30))
+    card_id = Column(Integer, ForeignKey('cards.card_id'), primary_key=True)
+    quantity_set = Column(Integer)
+    set_id = Column(Integer , ForeignKey("sets.set_id"), nullable=True)
+    set = relationship("Set" , back_populates="detective")
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'detective'
+    }
+
+class Event(Card):
+    __tablename__ ='events'
+    name = Column(String(30))
+    card_id = Column(Integer, ForeignKey('cards.card_id'), primary_key=True)
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'event'
+    }
+
 class Secrets(Base):
     __tablename__  = 'secrets'
     secret_id = Column(Integer, primary_key=True, autoincrement=True)
@@ -56,6 +85,14 @@ class Secrets(Base):
     game = relationship("Game", back_populates="secrets")
 
     
-   
+class Set(Base):
+    __tablename__ = 'sets'
+    set_id = Column(Integer , primary_key=True , autoincrement=True)
+    name = Column(String(30))
+    player_id = Column(Integer, ForeignKey("players.player_id"), nullable=True)  
+    player = relationship("Player", back_populates="sets")   
+    game_id = Column(Integer, ForeignKey("games.game_id"), nullable=False)  
+    game = relationship("Game", back_populates="sets")
+    detective = relationship("Detective" , back_populates="set")
 
 

@@ -3,7 +3,7 @@ from fastapi import Depends
 from src.database.database import SessionLocal, get_db
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from src.database.models import Player, Card
+from src.database.models import Player, Card , Detective , Event
 
 def setup_initial_draft_pile(game_id: int, db: Session):
     """
@@ -75,26 +75,78 @@ def deal_cards_to_players(game_id: int, db: Session):
     return {"message": f"Se repartieron 6 cartas a {num_players} jugadores en la partida {game_id}."}
 
 
-def init_cards(game_id : int , db: Session = Depends(get_db)):
+def init_detective_cards(game_id: int, db: Session = Depends(get_db)):
+    detectives_info = [
+        ("Harley Quin Wildcard", 4 , 1),
+        ("Adriane Oliver", 3 , 1),
+        ("Miss Marple", 3 , 3),
+        ("Parker Pyne", 3 , 2),
+        ("Tommy Beresford", 2 , 2),
+        ("Lady Eileen 'Bundle' Brent", 3 , 2),
+        ("Tuppence Beresford", 2 , 2),
+        ("Hercule Poirot", 3 , 3),
+        ("Mr Satterthwaite", 2 , 2),
+    ]
+
     new_cards_list = []
-    for _ in range(61): 
-        new_card_instance = Card(
-        type="Carta generica",
-        picked_up=False,
-        dropped=False,
-        player_id=None,
-        game_id=game_id
-        )
-        new_cards_list.append(new_card_instance)
+    for name, quantity, quantity_set in detectives_info:
+        for _ in range(quantity):
+            new_card_instance = Detective(
+                type="detective",
+                name=name,
+                picked_up=False,
+                dropped=False,
+                player_id=None,
+                game_id=game_id,
+                quantity_set = quantity_set,
+                set_id = None,
+
+            )
+            new_cards_list.append(new_card_instance)
 
     try:
         db.add_all(new_cards_list)
         db.commit()
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=400, detail=f"Error creating cards: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Error creating detective cards: {str(e)}")
     
-    return {"message": "61 cards created successfully"}
+    return {"message": f"{len(new_cards_list)} detective cards created successfully"}
+
+def init_event_cards(game_id: int, db: Session = Depends(get_db)):
+    events_info = [
+        ("Delay the murderer's escape!", 3),
+        ("Point your suspicions", 3),
+        ("Dead card folly", 3),
+        ("Another Victim", 2),
+        ("Look into the ashes", 3),
+        ("Card trade", 3),
+        ("And then there was one more...", 2),
+        ("Early train to paddington", 2),
+        ("Cards off the table", 1),
+    ]
+
+    new_events_list = []
+    for name, quantity in events_info:
+        for _ in range(quantity):
+            new_event_instance = Event(
+                type="event",
+                name=name,
+                picked_up=False,
+                dropped=False,
+                player_id=None,
+                game_id=game_id
+            )
+            new_events_list.append(new_event_instance)
+
+    try:
+        db.add_all(new_events_list)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error creating event cards: {str(e)}")
+    
+    return {"message": f"{len(new_events_list)} event cards created successfully"}
 
 
 def only_6 (player_id , db: Session = Depends(get_db)):

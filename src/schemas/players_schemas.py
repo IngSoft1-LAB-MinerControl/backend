@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ConfigDict
 from typing import Optional 
 import datetime
-from src.schemas.card_schemas import Card_Response
+from src.schemas.card_schemas import AllCardsResponse
 from src.schemas.secret_schemas import Secret_Response
 
 class Player_Base(BaseModel): 
@@ -15,6 +15,6 @@ class Player_Base(BaseModel):
 
 class Player_State(Player_Base) : 
     turn_order : int
-    cards : list[Card_Response]
+    cards : list[AllCardsResponse]
     secrets : list[Secret_Response]
     

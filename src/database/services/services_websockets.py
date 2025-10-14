@@ -1,16 +1,16 @@
 from fastapi.encoders import jsonable_encoder
 from fastapi import HTTPException, WebSocket
-from sqlalchemy import desc, true
+from sqlalchemy import desc, select, true, orm
 from sqlalchemy.orm import Session
-from src.schemas.card_schemas import Card_Response
+from src.schemas.card_schemas import Card_Response, AllCardsResponse
 from src.database.database import SessionLocal
-from src.database.models import Game, Player, Card
+from src.database.models import Detective, Game, Player, Card, Event
 from src.schemas.games_schemas import Game_Response
 from src.webSocket.connection_manager import lobbyManager, gameManager
 from src.schemas.players_schemas import Player_Base, Player_State
 import json 
 from sqlalchemy.orm import joinedload
-
+from pydantic import TypeAdapter
 async def broadcast_available_games(db: Session):
     """
     Obtiene las partidas disponibles y las envía a todos los clientes conectados.
@@ -109,14 +109,18 @@ async def broadcast_last_discarted_cards(player_id : int) :
     db = SessionLocal() 
     player = db.query(Player).filter(Player.player_id == player_id).first()
     game_id = player.game_id
-    cardsDropped = db.query(Card).filter(
-        Card.game_id == game_id,
-        Card.dropped == True
-    ).order_by(desc(Card.discardInt)).limit(5).all()
+    polymorphic_loader = orm.with_polymorphic(Card, [Detective, Event])
+    stmt = (
+        select(polymorphic_loader)
+        .where(Card.game_id == game_id, Card.dropped == True)
+        .order_by(desc(Card.discardInt))
+        .limit(5)
+    )
+    cardsDropped = db.execute(stmt).scalars().all()
     if not cardsDropped:
         raise HTTPException(status_code=404, detail="No cards found in the discard pile for this game.")
     
-    #Actualizo la mano del jugador tambien
+    #actualizo mano de jugador
     players = db.query(Player).options(
                         joinedload(Player.cards),joinedload(Player.secrets)).filter(Player.game_id == game_id).all()
     playersStateResponse = [Player_State.model_validate(player) for player in players]
@@ -125,14 +129,20 @@ async def broadcast_last_discarted_cards(player_id : int) :
         "type": "playersState",
         "data": playersStateResponseJson
     }), game_id)
+    # Se usa typeAdapter por una cuestion de compatibilidad de versiones entre python y pydantic
+    card_list_adapter = TypeAdapter(list[AllCardsResponse])
+
+    # Ahora validamos la lista completa contra el adaptador de listas.
+    cardsDroppedResponse = card_list_adapter.validate_python(cardsDropped, from_attributes=True)
     
-    cardsDroppedResponse = [Card_Response.model_validate(card) for card in cardsDropped]
     cardsResponseJson = jsonable_encoder(cardsDroppedResponse)
     await gameManager.broadcast(json.dumps({
         "type": "droppedCards",
         "data": cardsResponseJson
-    }), game_id)
-    
+    }), game_id)   
+
+ 
+
 
 
 

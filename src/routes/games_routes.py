@@ -5,7 +5,7 @@ from src.database.database import SessionLocal, get_db
 from src.database.models import Game 
 from src.schemas.games_schemas import Game_Base, Game_Response, Game_Initialized
 from src.database.services.services_games import assign_turn_to_players
-from src.database.services.services_cards import init_cards, deal_cards_to_players, setup_initial_draft_pile
+from src.database.services.services_cards import init_detective_cards , init_event_cards, deal_cards_to_players, setup_initial_draft_pile
 from src.database.services.services_secrets import init_secrets, deal_secrets_to_players
 from src.database.services.services_websockets import broadcast_available_games, broadcast_game_information
 from src.webSocket.connection_manager import lobbyManager, gameManager
@@ -65,7 +65,8 @@ async def initialize_game (game_id : int, db : Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Game already started")
     if game.players_amount >= game.min_players :  
         turns_assigned = assign_turn_to_players (game_id, db)
-        cards_initialized = init_cards (game_id, db)
+        detectives_initialized = init_detective_cards (game_id, db)
+        events_initialized = init_event_cards(game_id , db)
         draft_pile_initialized = setup_initial_draft_pile(game_id, db)
         secrets_initialized = init_secrets(game_id, db)
         cards_dealt = deal_cards_to_players (game_id, db)
