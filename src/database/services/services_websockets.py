@@ -82,6 +82,23 @@ async def broadcast_game_information ( game_id : int) :
         "type": "playersState",
         "data": playersStateResponseJson
     }), game_id)
+    
+    polymorphic_loader = orm.with_polymorphic(Card, [Detective, Event])
+    stmt = (
+        select(polymorphic_loader)
+        .where(Card.game_id == game_id, Card.draft == True)
+        .limit(3)
+    )
+    cardsDraft = db.execute(stmt).scalars().all()
+    if cardsDraft:
+        card_list_adapter = TypeAdapter(list[AllCardsResponse])
+        cardsDraftResponse = card_list_adapter.validate_python(cardsDraft, from_attributes=True)
+        cardsResponseJson = jsonable_encoder(cardsDraftResponse)
+        await gameManager.broadcast(json.dumps({
+            "type": "draftCards",
+            "data": cardsResponseJson
+        }), game_id)
+            
 
 async def broadcast_player_state(game_id: int):
     """

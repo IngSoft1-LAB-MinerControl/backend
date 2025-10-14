@@ -6,8 +6,7 @@ from src.database.models import Card , Game , Detective , Event
 from src.database.services.services_cards import only_6 , replenish_draft_pile
 from src.database.services.services_games import finish_game
 from src.schemas.card_schemas import Card_Response , Detective_Response , Event_Response, Discard_List_Request
-from src.database.services.services_websockets import broadcast_last_discarted_cards, broadcast_game_information , broadcast_player_state, broadcast_card_draft
-
+from src.database.services.services_websockets import broadcast_last_discarted_cards, broadcast_game_information , broadcast_player_state
 import random
 
 card = APIRouter()
@@ -140,7 +139,7 @@ async def pick_up_draft_card(game_id: int, card_id: int, player_id: int, db: Ses
 
         db.commit()
         db.refresh(card)
-        await broadcast_card_draft(game_id)
+        await broadcast_game_information(game_id)
         return card
     except Exception as e:
         db.rollback()
