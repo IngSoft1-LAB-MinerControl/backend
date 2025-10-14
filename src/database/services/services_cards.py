@@ -51,6 +51,7 @@ def deal_cards_to_players(game_id: int, db: Session):
 
     # Obtener todas las cartas disponibles (las que no tienen un player_id asignado).
     deck = db.query(Card).filter(Card.game_id == game_id, Card.player_id == None).all()
+    nsf = db.query(Event).filter(Event.name == "Not so fast").all()
     # se supone que esto se llama cuando arranca la partida asiq todo va a estar en None
 
     #se podria chequear con la cantidad de cartas y ver que el tamano de la lista 
@@ -58,12 +59,17 @@ def deal_cards_to_players(game_id: int, db: Session):
 
     # barajar las cartas 
     random.shuffle(deck)
-
+    random.shuffle(nsf)
     try:
         # Asignar 6 cartas a cada jugador.
         card_cursor = 0
+        nsf_cursor = 0
         for player in players:
-            for _ in range(6): # Repartir 6 cartas
+            nsf_to_deal = nsf[nsf_cursor] #Repartir 1 nsf a cada jugador
+            nsf_to_deal.player_id = player.player_id
+            nsf_to_deal.picked_up = True
+            nsf_cursor += 1
+            for _ in range(5): # Repartir 5 cartas
                 card_to_deal = deck[card_cursor]
                 # Asignar la carta al jugador (asignar una carta es cambiarle el player_id y poner picked_up en True)
                 card_to_deal.player_id = player.player_id
@@ -127,6 +133,9 @@ def init_event_cards(game_id: int, db: Session = Depends(get_db)):
         ("And then there was one more...", 2),
         ("Early train to paddington", 2),
         ("Cards off the table", 1),
+        ("Not so fast" , 10) ,
+        ("Social Faux Pas" , 3) ,
+        ("Blackmailed" , 1)
     ]
 
     new_events_list = []
