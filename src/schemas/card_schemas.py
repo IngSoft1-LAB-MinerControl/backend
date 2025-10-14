@@ -1,5 +1,5 @@
-from pydantic import BaseModel, ConfigDict
-from typing import Optional, Union 
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal, Optional, Union, Annotated 
 
 class Card_Response(BaseModel): 
     card_id : int
@@ -7,7 +7,6 @@ class Card_Response(BaseModel):
     game_id : int
     picked_up : bool
     dropped : bool
-    type : str
     draft: bool
     discardInt: int
     class config:
@@ -15,20 +14,26 @@ class Card_Response(BaseModel):
     model_config = ConfigDict(from_attributes=True)    
 
 class Detective_Response(Card_Response): 
+    type : Literal ['detective'] = 'detective'
     name : str
     quantity_set : int
     set_id : Optional[int] = None
     class config:
         orm_mode = True
-    model_config = ConfigDict(from_attributes=True)    
+    model_config = ConfigDict(from_attributes=True) 
+      
 
 class Event_Response(Card_Response): 
+    type : Literal ['event']  = 'event'
     name : str
     class config:
         orm_mode = True
-    model_config = ConfigDict(from_attributes=True)    
+    model_config = ConfigDict(from_attributes=True)
+      
 
-AllCardsResponse = Union[Detective_Response, Event_Response]
+AllCardsResponse = Annotated [
+    Union[Detective_Response, Event_Response],
+    Field(discriminator = 'type')]
 
 
    
