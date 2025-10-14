@@ -6,7 +6,7 @@ from src.schemas.games_schemas import Game_Response
 from src.schemas.players_schemas import Player_Base
 from src.database.models import Game, Player
 from src.database.database import get_db
-from src.database.services.services_websockets import broadcast_available_games, broadcast_lobby_information, broadcast_game_information
+from src.database.services.services_websockets import broadcast_available_games, broadcast_card_draft, broadcast_lobby_information, broadcast_game_information
 from src.webSocket.connection_manager import lobbyManager , gameManager
 
 ws = APIRouter()
@@ -60,7 +60,8 @@ async def ws_info_from_game(websocket : WebSocket, game_id : int, db : Session =
     await gameManager.connect(websocket, game_id)
     
     try : 
-        await broadcast_game_information( game_id)
+        await broadcast_game_information(game_id)
+        await broadcast_card_draft(game_id)
         
         while True:
             # Mantenemos la conexión abierta para detectar cuando el cliente se va.
