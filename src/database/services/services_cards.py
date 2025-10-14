@@ -51,12 +51,6 @@ def deal_cards_to_players(game_id: int, db: Session):
 
     # Obtener todas las cartas disponibles (las que no tienen un player_id asignado).
     deck = db.query(Card).filter(Card.game_id == game_id, Card.player_id == None).all()
-<<<<<<< HEAD
-
-
-=======
-   
->>>>>>> aa42d98 (SCRUM 48 nuevos campos para sets + cambios en detective y evento)
     # se supone que esto se llama cuando arranca la partida asiq todo va a estar en None
 
     #se podria chequear con la cantidad de cartas y ver que el tamano de la lista 
