@@ -28,7 +28,7 @@ def list_secrets_of_game(game_id : int , db: Session = Depends(get_db)):
     return secrets
 
 # 3 routes para revelar secreto 
-@secret.put("/secrets/reveal/{game_id}/{secret_id}/{player_id}", tags = ["Secrets"] , response_model= Secret_Response)
+@secret.put("/secrets/reveal/{game_id},{secret_id},{player_id}", tags = ["Secrets"] , response_model= Secret_Response)
 def reveal_secret(game_id : int, secret_id : int , player_id : int , db: Session = Depends(get_db)):
     # 2. Llamar a la función de servicio con los parámetros recibidos
     # La función de servicio se encarga de toda la lógica y las excepciones.
@@ -36,7 +36,7 @@ def reveal_secret(game_id : int, secret_id : int , player_id : int , db: Session
     return revealed
 
 # 1 route para ocultar secreto 
-@secret.put("/secrets/hide/{game_id}/{secret_id}/{player_id}", tags = ["Secrets"] , response_model= Secret_Response)
+@secret.put("/secrets/hide/{game_id},{secret_id},{player_id}", tags = ["Secrets"] , response_model= Secret_Response)
 def hide_secret(game_id : int, secret_id : int , player_id : int , db: Session = Depends(get_db)):
     # 2. Llamar a la función de servicio con los parámetros recibidos
     # La función de servicio se encarga de toda la lógica y las excepciones.
@@ -44,7 +44,7 @@ def hide_secret(game_id : int, secret_id : int , player_id : int , db: Session =
     return hidden
 
 # 1 route para robar secreto
-@secret.put("/secrets/steal/{game_id}/{secret_id}/{player_id}/{target_player_id}", tags = ["Secrets"] , response_model= Secret_Response)
+@secret.put("/secrets/steal/{game_id},{secret_id},{player_id},{target_player_id}", tags = ["Secrets"] , response_model= Secret_Response)
 def steal_secret(game_id : int, secret_id : int , player_id : int , target_player_id: int, db: Session = Depends(get_db)):
     # 2. Llamar a la función de servicio con los parámetros recibidos
     # La función de servicio se encarga de toda la lógica y las excepciones.
