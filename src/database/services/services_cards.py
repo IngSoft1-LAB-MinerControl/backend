@@ -85,7 +85,7 @@ def init_detective_cards(game_id: int, db: Session = Depends(get_db)):
         ("Miss Marple", 3 , 3),
         ("Parker Pyne", 3 , 2),
         ("Tommy Beresford", 2 , 2),
-        ("Lady Eileen \"Bundle\" Brent", 3 , 2),
+        ("Lady Eileen 'Bundle' Brent", 3 , 2),
         ("Tuppence Beresford", 2 , 2),
         ("Hercule Poirot", 3 , 3),
         ("Mr Satterthwaite", 2 , 2),
