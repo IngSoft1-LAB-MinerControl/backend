@@ -141,6 +141,31 @@ async def broadcast_last_discarted_cards(player_id : int) :
         "data": cardsResponseJson
     }), game_id)   
 
+         
+async def broadcast_card_draft(game_id : int) : 
+    db = SessionLocal()
+    polymorphic_loader = orm.with_polymorphic(Card, [Detective, Event])
+    stmt = (
+        select(polymorphic_loader)
+        .where(Card.game_id == game_id, Card.draft == True)
+        .limit(3)
+    )
+    cardsDraft = db.execute(stmt).scalars().all()
+    if not cardsDraft:
+        raise HTTPException(status_code=404, detail="No cards found in the draft pile for this game.")
+
+    # Se usa typeAdapter por una cuestion de compatibilidad de versiones entre python y pydantic
+    card_list_adapter = TypeAdapter(list[AllCardsResponse])
+
+    # Ahora validamos la lista completa contra el adaptador de listas.
+    cardsDraftResponse = card_list_adapter.validate_python(cardsDraft, from_attributes=True)
+
+    cardsResponseJson = jsonable_encoder(cardsDraftResponse)
+    await gameManager.broadcast(json.dumps({
+        "type": "draftCards",
+        "data": cardsResponseJson
+    }), game_id)   
+
  
 
 

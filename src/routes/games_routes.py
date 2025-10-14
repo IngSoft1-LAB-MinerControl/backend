@@ -7,7 +7,7 @@ from src.schemas.games_schemas import Game_Base, Game_Response, Game_Initialized
 from src.database.services.services_games import assign_turn_to_players
 from src.database.services.services_cards import init_detective_cards , init_event_cards, deal_cards_to_players, setup_initial_draft_pile
 from src.database.services.services_secrets import init_secrets, deal_secrets_to_players
-from src.database.services.services_websockets import broadcast_available_games, broadcast_game_information
+from src.database.services.services_websockets import broadcast_available_games, broadcast_card_draft, broadcast_game_information
 from src.webSocket.connection_manager import lobbyManager, gameManager
 
 
@@ -84,6 +84,7 @@ async def initialize_game (game_id : int, db : Session = Depends(get_db)):
         
         await broadcast_game_information(game_id)
         await broadcast_available_games(db)
+        await broadcast_card_draft(game_id)
     else : 
         raise HTTPException(status_code=424, detail=f"Error, you need more players to start game")
     return game

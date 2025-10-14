@@ -6,7 +6,8 @@ from src.database.models import Card , Game , Detective , Event
 from src.database.services.services_cards import only_6 , replenish_draft_pile
 from src.database.services.services_games import finish_game
 from src.schemas.card_schemas import Card_Response , Detective_Response , Event_Response, Discard_List_Request
-from src.database.services.services_websockets import broadcast_last_discarted_cards, broadcast_game_information , broadcast_player_state
+from src.database.services.services_websockets import broadcast_last_discarted_cards, broadcast_game_information , broadcast_player_state, broadcast_card_draft
+
 import random
 
 card = APIRouter()
@@ -89,7 +90,7 @@ async def discard_card(player_id : int , db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Error assigning card to player: {str(e)}")
     
-@card.put("/cards/game/drop/{player_id}/{card_id}", status_code= 200 , tags = ["Cards"], response_model= Card_Response)
+@card.put("/cards/game/drop/{player_id},{card_id}", status_code= 200 , tags = ["Cards"], response_model= Card_Response)
 def select_card_to_discard(player_id : int, card_id : int, db: Session = Depends (get_db)) : 
     card = db.query(Card).filter(Card.player_id == player_id , Card.dropped == False, Card.card_id == card_id).first()
     if not card:
@@ -125,8 +126,8 @@ def get_draft_pile(game_id: int, db: Session = Depends(get_db)):
     
     return draft_cards
 
-@card.put("/cards/draft_pickup/{game_id}/{card_id}/{player_id}", status_code=200, tags=["Cards"], response_model=Card_Response)
-def pick_up_draft_card(game_id: int, card_id: int, player_id: int, db: Session = Depends(get_db)):
+@card.put("/cards/draft_pickup/{game_id},{card_id},{player_id}", status_code=200, tags=["Cards"], response_model=Card_Response)
+async def pick_up_draft_card(game_id: int, card_id: int, player_id: int, db: Session = Depends(get_db)):
     card = db.query(Card).filter(Card.card_id == card_id, Card.game_id == game_id, Card.draft == True).first()
     if not card:
         raise HTTPException(status_code=404, detail="Card not found in draft pile.")
@@ -140,6 +141,7 @@ def pick_up_draft_card(game_id: int, card_id: int, player_id: int, db: Session =
 
         db.commit()
         db.refresh(card)
+        await broadcast_card_draft(game_id)
         return card
     except Exception as e:
         db.rollback()
