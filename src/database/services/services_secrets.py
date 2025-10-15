@@ -109,13 +109,13 @@ def hide_secret(game_id: int, player_id: int, secret_id: int, db: Session):
     db.refresh(secret)
     return secret
 
-def steal_secret(game_id: int, player_id: int, target_player_id: int, secret_id: int, db: Session):
-    secret = db.query(Secrets).filter(Secrets.game_id == game_id, Secrets.player_id == player_id, Secrets.secret_id == secret_id).first()
+def steal_secret(game_id: int, receive_secret_player_id: int, stealing_from_player_id: int, secret_id: int, db: Session):
+    secret = db.query(Secrets).filter(Secrets.game_id == game_id, Secrets.player_id == stealing_from_player_id, Secrets.secret_id == secret_id, Secrets.revelated == True).first()
     if not secret:
         raise HTTPException(status_code=404, detail="Secret not found")
-    
-    secret.player_id = target_player_id
-    hide_secret(game_id=game_id, player_id=player_id, secret_id=secret_id, db=db) # al robarlo se oculta automaticamente
+
+    secret.player_id = receive_secret_player_id
+    hide_secret(game_id=game_id, player_id=receive_secret_player_id, secret_id=secret_id, db=db) # al robarlo se oculta automaticamente
 
     db.commit()
     db.refresh(secret)
