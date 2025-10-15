@@ -55,7 +55,7 @@ async def activate_look_into_ashes_event(game_id: int, player_id: int, card_id: 
     await broadcast_last_discarted_cards(player_id)
     return taken_card
 
-@events.put("/event/one_more/{game_id},{receive_secret_player_id},{stealing_from_player_id},{secret_id}", status_code=200, tags=["Events"], response_model=Secret_Response)
+@events.put("/event/one_more/{game_id},{receive_secret_player_id},{stealing_from_player_id},{secret_id}", status_code=200, tags=["Events"])
 async def activate_one_more_event(game_id: int, receive_secret_player_id: int, stealing_from_player_id: int, secret_id: int, db: Session = Depends(get_db)):
     """
     Activa el evento 'One More': elige un secreto revelado y lo asigna boca abajo a otro jugador.
