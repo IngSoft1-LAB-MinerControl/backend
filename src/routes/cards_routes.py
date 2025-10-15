@@ -48,8 +48,10 @@ async def pickup_a_card(player_id: int, game_id: int, db: Session = Depends(get_
     game = db.query(Game).filter(Game.game_id == game_id).first()
     random.shuffle(deck)
     if not deck: 
+        finish_game(game_id, db)
         raise HTTPException(status_code=404, detail="Game finished")
     if game.cards_left is None:
+        finish_game(game_id, db)
         raise HTTPException(status_code=404, detail="Game finished")
     card = deck[0]
     try:

@@ -18,13 +18,10 @@ async def broadcast_available_games(db: Session):
     #).all()
 
     games = db.query(Game).all()
-    
-    # 2. Conviertes cada objeto ORM a un objeto Pydantic Game_Response
-    # Pydantic leerá los atributos (game.name, game.status, etc.) automáticamente
+    # Se convierten los objetos orm a un pydntic gameResponse para que se puedan leer los atributos de games luego
     gamesResponse = [Game_Response.model_validate(game) for game in games]
     
-    # 3. Usas jsonable_encoder para convertir los objetos Pydantic a una
-    # estructura de datos de Python compatible con JSON (listas de diccionarios)
+   # se lo pasa a formato json
     gamesResponseJson = jsonable_encoder(gamesResponse)
 
     
@@ -80,22 +77,6 @@ async def broadcast_game_information ( game_id : int) :
             "type": "playersState",
             "data": playersStateResponseJson
         }), game_id)
-        
-        polymorphic_loader = orm.with_polymorphic(Card, [Detective, Event])
-        stmt = (
-            select(polymorphic_loader)
-            .where(Card.game_id == game_id, Card.draft == True)
-            .limit(3)
-        )
-        cardsDraft = db.execute(stmt).scalars().all()
-        if cardsDraft:
-            card_list_adapter = TypeAdapter(list[AllCardsResponse])
-            cardsDraftResponse = card_list_adapter.validate_python(cardsDraft, from_attributes=True)
-            cardsResponseJson = jsonable_encoder(cardsDraftResponse)
-            await gameManager.broadcast(json.dumps({
-                "type": "draftCards",
-                "data": cardsResponseJson
-            }), game_id)
     finally : 
         db.close() #cierro la conecxion para evitar saturacion de conexiones en la bdd
             
