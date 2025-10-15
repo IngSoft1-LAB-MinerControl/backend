@@ -121,9 +121,14 @@ def play_set_of3(card_id : int , card_id_2: int , card_id_3: int , db:Session=De
     else: 
         raise HTTPException(status_code=400, detail=f"This are not three compatible detectives")
     
+
+
     card_1.set_id = new_set.set_id
     card_2.set_id = new_set.set_id
     card_3.set_id = new_set.set_id
+    card_1.player_id = None
+    card_2.player_id = None
+    card_3.player_id = None
     db.commit()
     db.refresh(card_1)
     db.refresh(card_2)
