@@ -6,15 +6,17 @@ from src.database.database import SessionLocal, get_db
 from src.database.models import Card , Game , Detective , Event , Set
 from src.database.services.services_cards import only_6
 from src.schemas.card_schemas import Card_Response , Detective_Response , Event_Response
-from src.database.services.services_websockets import broadcast_last_discarted_cards
+from src.database.services.services_websockets import broadcast_last_discarted_cards, broadcast_player_state
 import random
 
 set = APIRouter()
 
 @set.post("/sets_of2/{card_id},{card_id_2}", status_code=201, tags = ["Sets"])
-def play_set_of2(card_id : int , card_id_2:int , db:Session=Depends(get_db)):
+async def play_set_of2(card_id : int , card_id_2:int , db:Session=Depends(get_db)):
     card_1 = db.query(Detective).filter(Detective.card_id == card_id).first()
     card_2 = db.query(Detective).filter(Detective.card_id == card_id_2).first()
+    game = db.query(Game).filter(Game.game_id == card_1.game_id).first()
+    game_id = game.game_id
 
     if not card_1 or not card_2:
         raise HTTPException(status_code=400, detail=f"Invalid card_id")
@@ -64,9 +66,12 @@ def play_set_of2(card_id : int , card_id_2:int , db:Session=Depends(get_db)):
     
     card_1.set_id = new_set.set_id
     card_2.set_id = new_set.set_id
+    card_1.player_id = None
+    card_2.player_id = None 
     db.commit()
     db.refresh(card_1)
     db.refresh(card_2)
+    await broadcast_player_state(game_id)
     return new_set
 
 @set.get("/sets/list/{player_id}", status_code = 201, tags = {"Sets"})
