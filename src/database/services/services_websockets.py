@@ -18,13 +18,10 @@ async def broadcast_available_games(db: Session):
     #).all()
 
     games = db.query(Game).all()
-    
-    # 2. Conviertes cada objeto ORM a un objeto Pydantic Game_Response
-    # Pydantic leerá los atributos (game.name, game.status, etc.) automáticamente
+    # Se convierten los objetos orm a un pydntic gameResponse para que se puedan leer los atributos de games luego
     gamesResponse = [Game_Response.model_validate(game) for game in games]
     
-    # 3. Usas jsonable_encoder para convertir los objetos Pydantic a una
-    # estructura de datos de Python compatible con JSON (listas de diccionarios)
+   # se lo pasa a formato json
     gamesResponseJson = jsonable_encoder(gamesResponse)
 
     

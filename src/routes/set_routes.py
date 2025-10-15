@@ -69,7 +69,7 @@ def play_set_of2(card_id : int , card_id_2:int , db:Session=Depends(get_db)):
     db.refresh(card_2)
     return new_set
 
-@set.get("/sets/list/{player_id}", status_code = 201, response_model= Set_Response, tags = {"Sets"})
+@set.get("/sets/list/{player_id}", status_code = 201, tags = {"Sets"})
 def get_set_player (player_id : int , db : Session = Depends(get_db)): 
     set = db.query(Set).filter(Set.player_id == player_id).first()
     if not set: 
