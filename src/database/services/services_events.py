@@ -4,7 +4,7 @@ from sqlalchemy import desc, func
 from src.database.database import SessionLocal, get_db
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from src.database.models import Player, Card , Detective , Event, Secrets, Game # <-- Importa Game
+from src.database.models import Player, Card , Detective , Event, Secrets, Game, Set # <-- Importa Game
 from src.database.services.services_secrets import steal_secret as steal_secret_service
 from typing import List # <-- Importa List
 
@@ -109,3 +109,20 @@ def one_more(game_id: int, receive_secret_player_id: int, stealing_from_player_i
 #         db.rollback()
 #         raise HTTPException(status_code=500, detail=f"Error executing 'Delay the Murderer's Escape!': {str(e)}")
 
+
+def another_victim(game_id: int, new_player_id: int, set_id: int, db: Session):
+    """
+    Choose another victim for the 'Another Victim' event.
+    """
+    set = db.query(Set).filter(Set.game_id == game_id, Set.set_id == set_id).first()
+
+    if not set:
+        raise HTTPException(status_code=404, detail="Set not found.")
+    set.player_id = new_player_id
+    try:
+        db.commit()
+        db.refresh(set)
+        return {"message": "set has new owner."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error executing 'Another Victim' event: {str(e)}")
