@@ -48,7 +48,7 @@ def deal_cards_to_players(game_id: int, db: Session):
 
     # Obtener todas las cartas disponibles (las que no tienen un player_id asignado).
     deck = db.query(Card).filter(Card.game_id == game_id, Card.player_id == None).all()
-    nsf = db.query(Event).filter(Event.name == "Not so fast").all()
+    nsf = db.query(Event).filter(Event.game_id == game_id, Event.name == "Not so fast").all()
     # se supone que esto se llama cuando arranca la partida asiq todo va a estar en None
 
     #se podria chequear con la cantidad de cartas y ver que el tamano de la lista 

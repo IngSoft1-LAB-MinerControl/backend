@@ -4,15 +4,16 @@ from sqlalchemy import desc, func
 from src.database.database import SessionLocal, get_db
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from src.database.models import Player, Card , Detective , Event, Secrets, Game, Set # <-- Importa Game
+from src.database.models import Player, Card , Detective , Event, Secrets, Game, Set
+from src.database.services.services_games import finish_game
 from src.database.services.services_secrets import steal_secret as steal_secret_service
-from typing import List # <-- Importa List
+from typing import List 
 
 def cards_off_table(game_id: int, player_id: int, db: Session):
     """
     descarta las cartas not so fast de un jugador
     """
-    nsf = db.query(Event).filter(Event.name == "Not so fast", Event.game_id == game_id, Event.player_id == player_id).all()
+    nsf = db.query(Event).filter(Event.name == "Not so fast", Event.game_id == game_id, Event.player_id == player_id, Event.dropped == False).all()
 
     if not nsf:
         # No hay cartas "Not so fast" para este jugador, no hay nada que hacer
@@ -126,3 +127,31 @@ def another_victim(game_id: int, new_player_id: int, set_id: int, db: Session):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error executing 'Another Victim' event: {str(e)}")
+
+def early_train_paddington(game_id: int, db: Session):
+    """
+    Implement the effect of the 'Early Train to Paddington' event.
+    """
+    deck = db.query(Card).filter(Card.game_id == game_id, Card.player_id == None, Card.draft == False).all()
+    
+    if not deck:
+        raise HTTPException(status_code=404, detail="Deck not found.")
+    
+    if len(deck)<6:
+        finish_game(game_id) # se termina el juego si no hay mas cartas en el mazo
+        return {"message": "Not enough cards in the deck. The game has ended."}
+    
+    random.shuffle(deck)
+    max_discardInt = db.query(func.max(Card.discardInt)).filter(Card.game_id == game_id).scalar() or 0
+    for card in deck[:6]:
+        card.dropped = True
+        card.picked_up = False
+        max_discardInt += 1
+        card.discardInt = max_discardInt # Asigna el siguiente valor en la secuencia
+    try:
+        db.commit()
+        db.refresh(deck)
+        return {"message": "Early Train to Paddington event executed successfully."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error executing 'Early Train to Paddington' event: {str(e)}")

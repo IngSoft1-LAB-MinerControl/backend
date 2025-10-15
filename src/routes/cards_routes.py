@@ -44,15 +44,13 @@ async def pickup_a_card(player_id: int, game_id: int, db: Session = Depends(get_
     has_6_cards = only_6(player_id, db)
     if has_6_cards:
         raise HTTPException(status_code=400, detail="The player already has 6 cards")
-    deck = db.query(Card).filter(Card.game_id == game_id, Card.player_id == None).all()
+    deck = db.query(Card).filter(Card.game_id == game_id, Card.player_id == None, Card.draft == False).all()
     game = db.query(Game).filter(Game.game_id == game_id).first()
     random.shuffle(deck)
     if not deck: 
         finish_game(game_id, db)
-        raise HTTPException(status_code=404, detail="Game finished")
     if game.cards_left is None:
         finish_game(game_id, db)
-        raise HTTPException(status_code=404, detail="Game finished")
     card = deck[0]
     try:
         card.picked_up = True
