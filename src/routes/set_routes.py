@@ -154,7 +154,7 @@ def get_set_player (player_id : int , db : Session = Depends(get_db)):
 
 @set.put ("/sets/steal/{player_id_to}/{set_id}", status_code= 201,response_model= Set_Response, tags= ["Sets"])
 async def steal_set( player_id_to : int, set_id : int, db : Session = Depends(get_db)) :
-    set = db.query(Set).filter(Set.player_id == set_id).first()
+    set = db.query(Set).filter(Set.set_id == set_id).first()
     if not set : 
         raise HTTPException(status_code=400, detail=f"Player does not have that set")
     player_id_2 = db.query(Player).filter(Player.player_id == player_id_to).first()
@@ -166,7 +166,7 @@ async def steal_set( player_id_to : int, set_id : int, db : Session = Depends(ge
     try : 
         db.commit()
         db.refresh(set)
-        broadcast_player_state(set.game_id)
+        await broadcast_player_state(set.game_id)
 
         return set
     except Exception as e:

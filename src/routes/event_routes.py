@@ -18,7 +18,7 @@ events = APIRouter()
 @events.put("/event/look_into_ashes/{player_id},{card_id}", status_code=200, tags=["Events"], response_model=Card_Response)
 async def activate_look_into_ashes_event(player_id: int, card_id: int, db: Session = Depends(get_db)):
     # Validar player_id
-    player = db.query(Player).filter(Player.id == player_id).first()
+    player = db.query(Player).filter(Player.player_id == player_id).first()
     if not player:
         raise HTTPException(status_code=404, detail="Player not found.")
     # Validar card_id
@@ -30,3 +30,4 @@ async def activate_look_into_ashes_event(player_id: int, card_id: int, db: Sessi
     await broadcast_game_information(card.game_id)
     await broadcast_last_discarted_cards(player_id)
     return taken_card
+
