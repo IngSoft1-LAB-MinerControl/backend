@@ -5,7 +5,7 @@ from src.database.database import SessionLocal, get_db
 from src.database.models import Card , Game , Detective , Event, Secrets, Set, Player
 from src.database.services.services_cards import only_6 , replenish_draft_pile
 from src.database.services.services_games import finish_game
-from src.schemas.card_schemas import Card_Response , Detective_Response , Event_Response, Discard_List_Request, Secret_Response
+from src.schemas.card_schemas import Card_Response
 from src.database.services.services_websockets import broadcast_last_discarted_cards, broadcast_game_information , broadcast_player_state, broadcast_card_draft
 from src.database.services.services_events import cards_off_table, look_into_ashes, one_more, early_train_paddington, another_victim
 import random
