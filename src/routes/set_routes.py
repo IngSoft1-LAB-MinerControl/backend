@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, func  
 from src.schemas.set_schemas import Set_Response
 from src.database.database import SessionLocal, get_db
-from src.database.models import Card , Game , Detective , Event , Set
+from src.database.models import Card , Game , Detective , Event , Set, Player
 from src.database.services.services_cards import only_6
 from src.schemas.card_schemas import Card_Response , Detective_Response , Event_Response
 from src.database.services.services_websockets import broadcast_last_discarted_cards, broadcast_player_state
@@ -152,16 +152,21 @@ def get_set_player (player_id : int , db : Session = Depends(get_db)):
 
     return set 
 
-@set.put ("/sets/steal/{player_id_1_from}/{player_id_2_to}/{set_id}", status_code= 201,response_model= Set_Response, tags= ["Sets"])
-async def steal_set(player_id_1_from : int, player_id_2_to : int, set_id : int, db : Session = Depends(get_db)) :
-    set = db.query(Set).filter(Set.player_id == player_id_1_from).first()
+@set.put ("/sets/steal/{player_id_to}/{set_id}", status_code= 201,response_model= Set_Response, tags= ["Sets"])
+async def steal_set( player_id_to : int, set_id : int, db : Session = Depends(get_db)) :
+    set = db.query(Set).filter(Set.player_id == set_id).first()
     if not set : 
         raise HTTPException(status_code=400, detail=f"Player does not have that set")
+    player_id_2 = db.query(Player).filter(Player.player_id == player_id_to).first()
+    if not player_id_2 : 
+        raise HTTPException (status_code = 400, detail = f"Player id 2 does not exist") 
 
-    set.player_id = player_id_2_to
+
+    set.player_id = player_id_to
     try : 
         db.commit()
         db.refresh(set)
+        broadcast_player_state(set.game_id)
 
         return set
     except Exception as e:
