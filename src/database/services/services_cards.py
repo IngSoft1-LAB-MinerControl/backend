@@ -39,6 +39,29 @@ def replenish_draft_pile(game_id: int, db: Session):
     # Si no hay cartas, el draft pile simplemente se achicará. No es un error.
     return deck[0] if deck else None
 
+def deal_NSF(game_id: int , db:Session):
+
+    nsf = db.query(Event).filter(Event.name == "Not so fast" , Event.game_id == game_id).all()
+    players = db.query(Player).filter(Player.game_id == game_id).all()
+
+    random.shuffle(nsf)
+    try:
+        # Asignar 6 cartas a cada jugador.
+        nsf_cursor = 0
+        for player in players:
+            nsf_to_deal = nsf[nsf_cursor] #Repartir 1 nsf a cada jugador
+            nsf_to_deal.player_id = player.player_id
+            nsf_to_deal.picked_up = True
+            nsf_cursor += 1
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Ocurrió un error al repartir las cartas: {str(e)}")
+
+    return {"message": f"Se repartieron los NSF"}
+
+
+
 def deal_cards_to_players(game_id: int, db: Session):
     """
     Reparte 6 cartas aleatorias a cada jugador en una partida específica.
@@ -48,28 +71,17 @@ def deal_cards_to_players(game_id: int, db: Session):
     num_players = len(players)
 
     # Obtener todas las cartas disponibles (las que no tienen un player_id asignado).
-   
-    nsf = db.query(Event).filter(Event.name == "Not so fast").all()
+    deck = db.query(Card).filter(Card.game_id == game_id, Card.player_id == None).all()
+
     # se supone que esto se llama cuando arranca la partida asiq todo va a estar en None
 
     #se podria chequear con la cantidad de cartas y ver que el tamano de la lista 
     # y cartas sea la misma, sino error
 
     # barajar las cartas 
-    
-    random.shuffle(nsf)
+    random.shuffle(deck)
     try:
-        # Asignar 6 cartas a cada jugador.
         card_cursor = 0
-        nsf_cursor = 0
-        for player in players:
-            nsf_to_deal = nsf[nsf_cursor] #Repartir 1 nsf a cada jugador
-            nsf_to_deal.player_id = player.player_id
-            nsf_to_deal.picked_up = True
-            nsf_cursor += 1
-        deck = db.query(Card).filter(Card.game_id == game_id, Card.player_id == None).all()
-        random.shuffle(deck)
-        
         for player in players : 
             for _ in range(5): # Repartir 5 cartas
                 card_to_deal = deck[card_cursor]
