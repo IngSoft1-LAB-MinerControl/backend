@@ -165,7 +165,7 @@ async def steal_set( player_id_to : int, set_id : int, db : Session = Depends(ge
     try : 
         db.commit()
         db.refresh(set)
-        broadcast_player_state(set.game_id)
+        await broadcast_player_state(set.game_id)
 
         return set
     except Exception as e:
