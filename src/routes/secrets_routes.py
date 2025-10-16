@@ -51,7 +51,7 @@ async def hide_secret(secret_id : int , db: Session = Depends(get_db)):
 async def steal_secret(secret_id : int , target_player_id: int, db: Session = Depends(get_db)):
     # 2. Llamar a la función de servicio con los parámetros recibidos
     # La función de servicio se encarga de toda la lógica y las excepciones.
-    # se elije primero el jugador al que le robo y depues el jugador al que se lo doy
+    # se da el secret_id a robar y despues el jugador al que se lo doy
     stolen = steal_secret_service(target_player_id=target_player_id, secret_id=secret_id, db=db)
     await broadcast_game_information(stolen.game_id)
     return stolen

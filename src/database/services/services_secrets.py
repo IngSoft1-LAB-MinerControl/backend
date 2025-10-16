@@ -12,12 +12,12 @@ def deal_secrets_to_players(game_id: int, db: Session):
     el Cómplice son el mismo jugador.
     """
     players = db.query(Player).filter(Player.game_id == game_id).all()
-    num_players = len(players)
     secrets_deck = db.query(Secrets).filter(Secrets.game_id == game_id, Secrets.player_id.is_(None)).all()
-
-    if len(secrets_deck) < num_players * 3:
-        raise HTTPException(status_code=400, detail="No hay suficientes secretos para repartir o ya fueron repartidos.")
-
+    if not players:
+        raise HTTPException(status_code=404, detail="No players found for the given game_id")
+    if not secrets_deck:
+        raise HTTPException(status_code=404, detail="No secrets available to deal for the given game_id")
+    
     while True:
         # 1. Barajar las cartas en cada intento
         random.shuffle(secrets_deck)
@@ -47,7 +47,7 @@ def deal_secrets_to_players(game_id: int, db: Session):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Ocurrió un error al repartir los secretos: {str(e)}")
 
-    return {"message": f"Se repartieron 3 secretos a {num_players} jugadores en la partida {game_id}."}
+    return {"message": f"Se repartieron 3 secretos a {len(players)} jugadores en la partida {game_id}."}
 
 def init_secrets(game_id : int , db: Session = Depends(get_db)):
     new_secret_list = []
@@ -93,9 +93,13 @@ async def reveal_secret(secret_id: int, db: Session):
     if secret.murderer:
         # Si es la carta del asesino, se termina el juego
         await finish_game(secret.game_id, db)
-    db.commit()
-    db.refresh(secret)
-    return secret
+    try:
+        db.commit()
+        db.refresh(secret)
+        return secret
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error revealing secret: {str(e)}")
 
 def hide_secret(secret_id: int, db: Session):
     secret = db.query(Secrets).filter(Secrets.secret_id == secret_id).first()
@@ -104,19 +108,31 @@ def hide_secret(secret_id: int, db: Session):
     if not secret.revelated:
         raise HTTPException(status_code=400, detail="Secret is not revealed")
     secret.revelated = False
-    db.commit()
-    db.refresh(secret)
-    return secret
+    try: 
+        db.commit()
+        db.refresh(secret)
+        return secret
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error hiding secret: {str(e)}")
 
 def steal_secret(target_player_id: int, secret_id: int, db: Session):
-    # le roba al player_id y el nuevo dueño del secreto es target_player_id
+    # roba secreto_id y el nuevo dueño del secreto es target_player_id
+    # EL SECRETO TIENE QUE ESTAR REVELADO
     secret = db.query(Secrets).filter(Secrets.secret_id == secret_id).first()
     if not secret:
         raise HTTPException(status_code=404, detail="Secret not found")
-    
-    secret.player_id = target_player_id
-    hide_secret(secret_id=secret_id, db=db) # al robarlo se oculta automaticamente
+    new_owner = db.query(Player).filter(Player.player_id == target_player_id).first()
+    if not new_owner:
+        raise HTTPException(status_code=404, detail="Player not found")
 
-    db.commit()
-    db.refresh(secret)
-    return secret
+    hide_secret(secret_id=secret_id, db=db) # al robarlo se oculta automaticamente
+    secret.player_id = new_owner.player_id
+
+    try:
+        db.commit()
+        db.refresh(secret)
+        return secret
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error stealing secret: {str(e)}")
