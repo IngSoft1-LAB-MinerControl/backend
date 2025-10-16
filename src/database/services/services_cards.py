@@ -3,7 +3,7 @@ from fastapi import Depends
 from src.database.database import SessionLocal, get_db
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from src.database.models import Player, Card , Detective , Event
+from src.database.models import Player, Card , Detective , Event, Game
 
 def setup_initial_draft_pile(game_id: int, db: Session):
     """
@@ -26,15 +26,16 @@ def replenish_draft_pile(game_id: int, db: Session):
     """
     Repone una carta en el draft pile desde el mazo principal.
     """
+    game = db.query(Game).filter(Game.game_id == game_id).first()
     deck = db.query(Card).filter(
         Card.game_id == game_id,
         Card.player_id.is_(None),
         Card.draft == False
     ).all()
     random.shuffle(deck)
-
+     
     deck[0].draft = True
-
+    game.cards_left = game.cards_left -1
     # Si no hay cartas, el draft pile simplemente se achicará. No es un error.
     return deck[0] if deck else None
 
@@ -47,7 +48,7 @@ def deal_cards_to_players(game_id: int, db: Session):
     num_players = len(players)
 
     # Obtener todas las cartas disponibles (las que no tienen un player_id asignado).
-    deck = db.query(Card).filter(Card.game_id == game_id, Card.player_id == None).all()
+   
     nsf = db.query(Event).filter(Event.name == "Not so fast").all()
     # se supone que esto se llama cuando arranca la partida asiq todo va a estar en None
 
@@ -55,7 +56,7 @@ def deal_cards_to_players(game_id: int, db: Session):
     # y cartas sea la misma, sino error
 
     # barajar las cartas 
-    random.shuffle(deck)
+    
     random.shuffle(nsf)
     try:
         # Asignar 6 cartas a cada jugador.
@@ -66,6 +67,10 @@ def deal_cards_to_players(game_id: int, db: Session):
             nsf_to_deal.player_id = player.player_id
             nsf_to_deal.picked_up = True
             nsf_cursor += 1
+        deck = db.query(Card).filter(Card.game_id == game_id, Card.player_id == None).all()
+        random.shuffle(deck)
+        
+        for player in players : 
             for _ in range(5): # Repartir 5 cartas
                 card_to_deal = deck[card_cursor]
                 # Asignar la carta al jugador (asignar una carta es cambiarle el player_id y poner picked_up en True)

@@ -1,6 +1,7 @@
 from fastapi import Depends, HTTPException , HTTPException
 from sqlalchemy import extract
 from sqlalchemy.orm import Session  
+from src.database.services.services_websockets import broadcast_game_information
 from src.database.database import SessionLocal, get_db
 from src.database.models import Game, Player 
 from src.schemas.games_schemas import Game_Base
@@ -78,7 +79,7 @@ def assign_turn_to_players (game_id : int, db :Session = Depends (get_db)) :
     return game
 
 
-def finish_game (game_id : int , db : Session = Depends(get_db)) : 
+async def finish_game (game_id : int , db : Session = Depends(get_db)) : 
     game = db.query(Game).where(Game.game_id == game_id).first()
     if game.status != 'finished' : 
         game.status = 'finished'
@@ -86,6 +87,7 @@ def finish_game (game_id : int , db : Session = Depends(get_db)) :
         try:
             db.commit()
             db.refresh(game)
+            await broadcast_game_information(game_id)
         except Exception as e:
             db.rollback()
             raise HTTPException(status_code=400, detail=f"Error finishing the game: {str(e)}")  
