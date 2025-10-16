@@ -48,7 +48,7 @@ def deal_cards_to_players(game_id: int, db: Session):
     num_players = len(players)
 
     # Obtener todas las cartas disponibles (las que no tienen un player_id asignado).
-    deck = db.query(Card).filter(Card.game_id == game_id, Card.player_id == None).all()
+   
     nsf = db.query(Event).filter(Event.name == "Not so fast").all()
     # se supone que esto se llama cuando arranca la partida asiq todo va a estar en None
 
@@ -56,7 +56,7 @@ def deal_cards_to_players(game_id: int, db: Session):
     # y cartas sea la misma, sino error
 
     # barajar las cartas 
-    random.shuffle(deck)
+    
     random.shuffle(nsf)
     try:
         # Asignar 6 cartas a cada jugador.
@@ -67,6 +67,10 @@ def deal_cards_to_players(game_id: int, db: Session):
             nsf_to_deal.player_id = player.player_id
             nsf_to_deal.picked_up = True
             nsf_cursor += 1
+        deck = db.query(Card).filter(Card.game_id == game_id, Card.player_id == None).all()
+        random.shuffle(deck)
+        
+        for player in players : 
             for _ in range(5): # Repartir 5 cartas
                 card_to_deal = deck[card_cursor]
                 # Asignar la carta al jugador (asignar una carta es cambiarle el player_id y poner picked_up en True)
