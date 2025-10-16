@@ -94,6 +94,7 @@ def reveal_secret(game_id: int, player_id: int, secret_id: int, db: Session):
         # Si es la carta del asesino, se termina el juego
         finish_game(game_id, db)
 
+
     db.commit()
     db.refresh(secret)
     return secret
@@ -110,12 +111,13 @@ def hide_secret(game_id: int, player_id: int, secret_id: int, db: Session):
     return secret
 
 def steal_secret(game_id: int, player_id: int, target_player_id: int, secret_id: int, db: Session):
+    # le roba al player_id y el nuevo dueno del secreto es target_player_id
     secret = db.query(Secrets).filter(Secrets.game_id == game_id, Secrets.player_id == player_id, Secrets.secret_id == secret_id).first()
     if not secret:
         raise HTTPException(status_code=404, detail="Secret not found")
     
     secret.player_id = target_player_id
-    hide_secret(game_id=game_id, player_id=player_id, secret_id=secret_id, db=db) # al robarlo se oculta automaticamente
+    hide_secret(game_id=game_id, player_id=target_player_id, secret_id=secret_id, db=db) # al robarlo se oculta automaticamente
 
     db.commit()
     db.refresh(secret)
