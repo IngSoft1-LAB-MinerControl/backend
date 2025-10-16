@@ -3,7 +3,7 @@ from fastapi import Depends
 from src.database.database import SessionLocal, get_db
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from src.database.models import Player, Card , Detective , Event
+from src.database.models import Player, Card , Detective , Event, Game
 
 def setup_initial_draft_pile(game_id: int, db: Session):
     """
@@ -26,15 +26,16 @@ def replenish_draft_pile(game_id: int, db: Session):
     """
     Repone una carta en el draft pile desde el mazo principal.
     """
+    game = db.query(Game).filter(Game.game_id == game_id).first()
     deck = db.query(Card).filter(
         Card.game_id == game_id,
         Card.player_id.is_(None),
         Card.draft == False
     ).all()
     random.shuffle(deck)
-
+     
     deck[0].draft = True
-
+    game.cards_left = game.cards_left -1
     # Si no hay cartas, el draft pile simplemente se achicará. No es un error.
     return deck[0] if deck else None
 
