@@ -72,7 +72,7 @@ async def initialize_game (game_id : int, db : Session = Depends(get_db)):
         cards_dealt = deal_cards_to_players (game_id, db)
         secrets_dealt = deal_secrets_to_players (game_id, db)
         draft_pile_initialized = setup_initial_draft_pile(game_id, db)
-        game.cards_left = 61 - (game.players_amount * 6)
+        game.cards_left = 61 - (game.players_amount * 6) - 3 #Se le resta el draft y las cartas repartidas
         game.status = "in course"
         
         try:

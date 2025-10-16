@@ -83,7 +83,6 @@ async def finish_game (game_id : int , db : Session = Depends(get_db)) :
     game = db.query(Game).where(Game.game_id == game_id).first()
     if game.status != 'finished' : 
         game.status = 'finished'
-        db.add(game)
         try:
             db.commit()
             db.refresh(game)
