@@ -3,7 +3,7 @@ from fastapi import Depends
 from src.database.database import SessionLocal, get_db
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from src.database.models import Player, Card , Detective , Event
+from src.database.models import Player, Card , Detective , Event, Game
 
 def setup_initial_draft_pile(game_id: int, db: Session):
     """
@@ -26,17 +26,41 @@ def replenish_draft_pile(game_id: int, db: Session):
     """
     Repone una carta en el draft pile desde el mazo principal.
     """
+    game = db.query(Game).filter(Game.game_id == game_id).first()
     deck = db.query(Card).filter(
         Card.game_id == game_id,
         Card.player_id.is_(None),
         Card.draft == False
     ).all()
     random.shuffle(deck)
-
+     
     deck[0].draft = True
-
+    game.cards_left = game.cards_left -1
     # Si no hay cartas, el draft pile simplemente se achicará. No es un error.
     return deck[0] if deck else None
+
+def deal_NSF(game_id: int , db:Session):
+
+    nsf = db.query(Event).filter(Event.name == "Not so fast" , Event.game_id == game_id).all()
+    players = db.query(Player).filter(Player.game_id == game_id).all()
+
+    random.shuffle(nsf)
+    try:
+        # Asignar 6 cartas a cada jugador.
+        nsf_cursor = 0
+        for player in players:
+            nsf_to_deal = nsf[nsf_cursor] #Repartir 1 nsf a cada jugador
+            nsf_to_deal.player_id = player.player_id
+            nsf_to_deal.picked_up = True
+            nsf_cursor += 1
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Ocurrió un error al repartir las cartas: {str(e)}")
+
+    return {"message": f"Se repartieron los NSF"}
+
+
 
 def deal_cards_to_players(game_id: int, db: Session):
     """
@@ -48,7 +72,6 @@ def deal_cards_to_players(game_id: int, db: Session):
 
     # Obtener todas las cartas disponibles (las que no tienen un player_id asignado).
     deck = db.query(Card).filter(Card.game_id == game_id, Card.player_id == None).all()
-    nsf = db.query(Event).filter(Event.game_id == game_id, Event.name == "Not so fast").all()
     # se supone que esto se llama cuando arranca la partida asiq todo va a estar en None
 
     #se podria chequear con la cantidad de cartas y ver que el tamano de la lista 
@@ -56,16 +79,9 @@ def deal_cards_to_players(game_id: int, db: Session):
 
     # barajar las cartas 
     random.shuffle(deck)
-    random.shuffle(nsf)
     try:
-        # Asignar 6 cartas a cada jugador.
         card_cursor = 0
-        nsf_cursor = 0
-        for player in players:
-            nsf_to_deal = nsf[nsf_cursor] #Repartir 1 nsf a cada jugador
-            nsf_to_deal.player_id = player.player_id
-            nsf_to_deal.picked_up = True
-            nsf_cursor += 1
+        for player in players : 
             for _ in range(5): # Repartir 5 cartas
                 card_to_deal = deck[card_cursor]
                 # Asignar la carta al jugador (asignar una carta es cambiarle el player_id y poner picked_up en True)

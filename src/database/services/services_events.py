@@ -26,14 +26,14 @@ def cards_off_table(game_id: int, player_id: int, db: Session):
         db.rollback() 
         raise HTTPException(status_code=500, detail=f"Error discarding 'Not so fast' cards: {str(e)}")
 
-def look_into_ashes(game_id: int, player_id: int, card_id: int, db: Session):
+def look_into_ashes(player_id: int, card_id: int, db: Session):
     """
     mira las ultimas 5 cartas de la pila de descarte y toma una 
     en realidad le llega una card_id del front que. esta la funcion que le muestra las 5 
     cartas del descarte. entonces en el endpoint que llama esta funcion solo elije una de esas 5 cartas
     y le cambio dueno y dropped por true
     """
-    card = db.query(Card).filter(Card.card_id == card_id, Card.game_id == game_id, Card.dropped == True).first()
+    card = db.query(Card).filter(Card.card_id == card_id, Card.dropped == True).first()
     if not card:
         raise HTTPException(status_code=404, detail="Card not found.")
     try:

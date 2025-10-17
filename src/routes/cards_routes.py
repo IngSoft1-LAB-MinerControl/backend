@@ -44,6 +44,7 @@ async def pickup_a_card(player_id: int, game_id: int, db: Session = Depends(get_
     has_6_cards = only_6(player_id, db)
     if has_6_cards:
         raise HTTPException(status_code=400, detail="The player already has 6 cards")
+<<<<<<< HEAD
     deck = db.query(Card).filter(Card.game_id == game_id, Card.picked_up == False, Card.dropped == False, Card.draft == False).all()
     game = db.query(Game).filter(Game.game_id == game_id).first()
     random.shuffle(deck)
@@ -51,6 +52,15 @@ async def pickup_a_card(player_id: int, game_id: int, db: Session = Depends(get_
         finish_game(game_id, db)
     if game.cards_left is None:
         finish_game(game_id, db)
+=======
+    deck = db.query(Card).filter(Card.game_id == game_id, Card.dropped == False , Card.picked_up == False , Card.draft == False).all()
+    game = db.query(Game).filter(Game.game_id == game_id).first()
+    random.shuffle(deck)
+    if not deck: 
+       await finish_game(game_id, db)
+    if game.cards_left is None:
+       await finish_game(game_id, db)
+>>>>>>> SCRUM-82-Creacion-de-endpoint-para-levantar-del-draft-look-into-the-ashes
     card = deck[0]
     try:
         card.picked_up = True

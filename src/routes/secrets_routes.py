@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException  #te permite definir las r
 from sqlalchemy.orm import Session  
 from src.database.database import SessionLocal, get_db
 from src.database.models import Player, Secrets
+from src.database.services.services_websockets import broadcast_player_state , broadcast_game_information
 from src.schemas.secret_schemas import Secret_Response
 from src.database.services.services_secrets import reveal_secret as reveal_secret_service, hide_secret as hide_secret_service, steal_secret as steal_secret_service
 
@@ -28,26 +29,29 @@ def list_secrets_of_game(game_id : int , db: Session = Depends(get_db)):
     return secrets
 
 # 3 routes para revelar secreto 
-@secret.put("/secrets/reveal/{game_id},{secret_id},{player_id}", tags = ["Secrets"] , response_model= Secret_Response)
-def reveal_secret(game_id : int, secret_id : int , player_id : int , db: Session = Depends(get_db)):
+@secret.put("/secrets/reveal/{secret_id}", tags = ["Secrets"] , response_model= Secret_Response)
+async def reveal_secret(secret_id : int ,  db: Session = Depends(get_db)):
     # 2. Llamar a la función de servicio con los parámetros recibidos
     # La función de servicio se encarga de toda la lógica y las excepciones.
-    revealed = reveal_secret_service(game_id=game_id, player_id=player_id, secret_id=secret_id, db=db)
+    revealed = await reveal_secret_service(secret_id=secret_id, db=db)
+    await broadcast_game_information(revealed.game_id)
     return revealed
 
 # 1 route para ocultar secreto 
-@secret.put("/secrets/hide/{game_id},{secret_id},{player_id}", tags = ["Secrets"] , response_model= Secret_Response)
-def hide_secret(game_id : int, secret_id : int , player_id : int , db: Session = Depends(get_db)):
+@secret.put("/secrets/hide/{secret_id}", tags = ["Secrets"] , response_model= Secret_Response)
+async def hide_secret(secret_id : int , db: Session = Depends(get_db)):
     # 2. Llamar a la función de servicio con los parámetros recibidos
     # La función de servicio se encarga de toda la lógica y las excepciones.
-    hidden = hide_secret_service(game_id=game_id, player_id=player_id, secret_id=secret_id, db=db)
+    hidden = hide_secret_service(secret_id=secret_id, db=db)
+    await broadcast_game_information(hidden.game_id)
     return hidden
 
 # 1 route para robar secreto
-@secret.put("/secrets/steal/{game_id},{secret_id},{player_id},{target_player_id}", tags = ["Secrets"] , response_model= Secret_Response)
-def steal_secret(game_id : int, secret_id : int , player_id : int , target_player_id: int, db: Session = Depends(get_db)):
+@secret.put("/secrets/steal/{secret_id},{target_player_id}", tags = ["Secrets"] , response_model= Secret_Response)
+async def steal_secret(secret_id : int , target_player_id: int, db: Session = Depends(get_db)):
     # 2. Llamar a la función de servicio con los parámetros recibidos
     # La función de servicio se encarga de toda la lógica y las excepciones.
     # se elije primero el jugador al que le robo y depues el jugador al que se lo doy
-    stolen = steal_secret_service(game_id=game_id, player_id=player_id, target_player_id=target_player_id, secret_id=secret_id, db=db)
+    stolen = steal_secret_service(target_player_id=target_player_id, secret_id=secret_id, db=db)
+    await broadcast_game_information(stolen.game_id)
     return stolen

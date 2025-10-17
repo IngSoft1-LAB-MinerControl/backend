@@ -5,7 +5,7 @@ from src.database.database import SessionLocal, get_db
 from src.database.models import Game 
 from src.schemas.games_schemas import Game_Base, Game_Response, Game_Initialized
 from src.database.services.services_games import assign_turn_to_players
-from src.database.services.services_cards import init_detective_cards , init_event_cards, deal_cards_to_players, setup_initial_draft_pile
+from src.database.services.services_cards import init_detective_cards , init_event_cards, deal_cards_to_players, setup_initial_draft_pile , deal_NSF
 from src.database.services.services_secrets import init_secrets, deal_secrets_to_players
 from src.database.services.services_websockets import broadcast_available_games, broadcast_card_draft, broadcast_game_information
 from src.webSocket.connection_manager import lobbyManager, gameManager
@@ -68,10 +68,11 @@ async def initialize_game (game_id : int, db : Session = Depends(get_db)):
         detectives_initialized = init_detective_cards (game_id, db)
         events_initialized = init_event_cards(game_id , db)
         secrets_initialized = init_secrets(game_id, db)
+        nsf_dealt = deal_NSF(game_id , db)
         cards_dealt = deal_cards_to_players (game_id, db)
         secrets_dealt = deal_secrets_to_players (game_id, db)
         draft_pile_initialized = setup_initial_draft_pile(game_id, db)
-        game.cards_left = 61 - (game.players_amount * 6)
+        game.cards_left = 61 - (game.players_amount * 6) - 3 #Se le resta el draft y las cartas repartidas
         game.status = "in course"
         
         try:
