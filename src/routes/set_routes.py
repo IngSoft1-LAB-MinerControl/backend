@@ -161,7 +161,6 @@ async def steal_set( player_id_to : int, set_id : int, db : Session = Depends(ge
     if not player_id_2 : 
         raise HTTPException (status_code = 400, detail = f"Player id 2 does not exist") 
 
-
     set.player_id = player_id_to
     try : 
         db.commit()
