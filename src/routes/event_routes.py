@@ -7,62 +7,46 @@ from src.database.services.services_cards import only_6 , replenish_draft_pile
 from src.database.services.services_games import finish_game
 from src.schemas.card_schemas import Card_Response
 from src.database.services.services_websockets import broadcast_last_discarted_cards, broadcast_game_information , broadcast_player_state, broadcast_card_draft
-from src.database.services.services_events import cards_off_table, look_into_ashes, one_more, early_train_paddington, another_victim
+from src.database.services.services_events import cards_off_table, look_into_ashes, one_more, early_train_paddington
 import random
 
 events = APIRouter()
 
-@events.put("/event/cards_off_table/{game_id},{player_id}", status_code=200, tags=["Events"])
-async def activate_cards_off_table_event(game_id: int, player_id: int, db: Session = Depends(get_db)):
+@events.put("/event/cards_off_table/{player_id}", status_code=200, tags=["Events"])
+async def activate_cards_off_table_event(player_id: int, db: Session = Depends(get_db)):
     """
     Activa el evento 'Cards off the table': descarta las cartas not so fast de un jugador.
     """
-    # Validar game_id
-    game = db.query(Game).filter(Game.game_id == game_id).first()
-    if not game:
-        raise HTTPException(status_code=404, detail="Game not found.")
-    # Validar player_id
-    player = db.query(Player).filter(Player.game_id == game_id, Player.id == player_id).first()
+    player= db.query(Player).filter(Player.player_id == player_id).first()
     if not player:
         raise HTTPException(status_code=404, detail="Player not found.")
-    
-    result = cards_off_table(game_id=game_id, player_id=player_id, db=db)
-    await broadcast_game_information(game_id)
+    result = cards_off_table(player_id=player_id, db=db)
+ 
+    await broadcast_game_information(player.game_id)
+    await broadcast_last_discarted_cards(player.game_id)
     return result
 
-@events.put("/event/one_more/{game_id},{receive_secret_player_id},{stealing_from_player_id},{secret_id}", status_code=200, tags=["Events"])
-async def activate_one_more_event(game_id: int, receive_secret_player_id: int, stealing_from_player_id: int, secret_id: int, db: Session = Depends(get_db)):
+@events.put("/event/one_more/{new_secret_player_id},{secret_id}", status_code=200, tags=["Events"])
+async def activate_one_more_event(new_secret_player_id: int, secret_id: int, db: Session = Depends(get_db)):
     """
     Activa el evento 'One More': elige un secreto revelado y lo asigna boca abajo a otro jugador.
     """
     # Validar game_id
-    game = db.query(Game).filter(Game.game_id == game_id).first()
-    if not game:
-        raise HTTPException(status_code=404, detail="Game not found.")
+    # Validar new_secret_player_id
+    new_secret_player = db.query(Player).filter(Player.player_id == new_secret_player_id).first()
+    if not new_secret_player:
+        raise HTTPException(status_code=404, detail="New secret Player not found.")
 
-    # Validar receive_secret_player_id
-    receive_secret_player = db.query(Player).filter(Player.player_id == receive_secret_player_id, Player.game_id == game_id).first()
-    if not receive_secret_player:
-        raise HTTPException(status_code=404, detail="Receive secret Player not found in this game.")
-
-    # Validar stealing_from_player_id
-    stealing_from_player = db.query(Player).filter(Player.player_id == stealing_from_player_id, Player.game_id == game_id).first()
-    if not stealing_from_player:
-        raise HTTPException(status_code=404, detail="Stealing from Player not found in this game.")
-
-    # Validar secret_id y que pertenezca al stealing_from_player y esté revelado
+    # Validar secret_id y esté revelado
     secret = db.query(Secrets).filter(
         Secrets.secret_id == secret_id,
-        Secrets.game_id == game_id,
-        Secrets.player_id == stealing_from_player_id,
         Secrets.revelated == True  # Solo se pueden robar secretos revelados
     ).first()
     if not secret:
-        raise HTTPException(status_code=404, detail="Secret not found or is not revealed or does not belong to the stealing from player.")
-    
-    updated_secret = one_more(game_id=game_id, receive_secret_player_id=receive_secret_player_id, stealing_from_player_id=stealing_from_player_id, secret_id=secret_id, db=db)
-    await broadcast_game_information(game_id)
-    await broadcast_player_state(game_id)
+        raise HTTPException(status_code=404, detail="Secret not found or is not revealed.")
+
+    updated_secret = one_more(new_secret_player_id=new_secret_player_id, secret_id=secret_id, db=db)
+    await broadcast_game_information(new_secret_player.game_id)
     return updated_secret
 
 @events.put("/event/early_train_paddington/{game_id}", status_code=200, tags=["Events"])

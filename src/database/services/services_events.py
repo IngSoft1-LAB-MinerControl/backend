@@ -9,11 +9,11 @@ from src.database.services.services_games import finish_game
 from src.database.services.services_secrets import steal_secret as steal_secret_service
 from typing import List 
 
-def cards_off_table(game_id: int, player_id: int, db: Session):
+def cards_off_table(player_id: int, db: Session):
     """
     descarta las cartas not so fast de un jugador
     """
-    nsf = db.query(Event).filter(Event.name == "Not so fast", Event.game_id == game_id, Event.player_id == player_id, Event.dropped == False).all()
+    nsf = db.query(Event).filter(Event.name == "Not so fast", Event.player_id == player_id, Event.dropped == False).all()
 
     if not nsf:
         # No hay cartas "Not so fast" para este jugador, no hay nada que hacer
@@ -48,18 +48,15 @@ def look_into_ashes(player_id: int, card_id: int, db: Session):
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Error assigning card to player: {str(e)}")
 
-def one_more(game_id: int, receive_secret_player_id: int, stealing_from_player_id: int, secret_id: int, db: Session):
+def one_more(receive_secret_player_id: int, secret_id: int, db: Session):
     """
     Choose one revealed secret card and add it, face-down, to any player's secrets, 
     including your own. This may remove social disgrace.
     """
     try:
         stolen_secret = steal_secret_service(
-            game_id=game_id,
             receive_secret_player_id=receive_secret_player_id, # El jugador que recibe el secreto
-            stealing_from_player_id=stealing_from_player_id, # El jugador del que se "roba"
             secret_id=secret_id,
-            db=db
         )
         return stolen_secret
     except HTTPException as e:
@@ -110,23 +107,6 @@ def one_more(game_id: int, receive_secret_player_id: int, stealing_from_player_i
 #         db.rollback()
 #         raise HTTPException(status_code=500, detail=f"Error executing 'Delay the Murderer's Escape!': {str(e)}")
 
-
-def another_victim(game_id: int, new_player_id: int, set_id: int, db: Session):
-    """
-    Choose another victim for the 'Another Victim' event.
-    """
-    set = db.query(Set).filter(Set.game_id == game_id, Set.set_id == set_id).first()
-
-    if not set:
-        raise HTTPException(status_code=404, detail="Set not found.")
-    set.player_id = new_player_id
-    try:
-        db.commit()
-        db.refresh(set)
-        return {"message": "set has new owner."}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error executing 'Another Victim' event: {str(e)}")
 
 def early_train_paddington(game_id: int, db: Session):
     """
