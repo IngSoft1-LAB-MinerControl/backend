@@ -5,6 +5,7 @@ from src.routes.cards_routes import card
 from src.routes.secrets_routes import secret
 from src.routes.websocket_routes import ws
 from src.routes.set_routes import set
+from src.routes.event_routes import events
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -35,6 +36,7 @@ app.include_router(game)
 app.include_router(card)
 app.include_router(secret)
 app.include_router(set)
+app.include_router(events)
 
 
 
