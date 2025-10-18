@@ -93,6 +93,8 @@ async def initialize_game (game_id : int, db : Session = Depends(get_db)):
 @game.put ("/game/update_turn/{game_id}", status_code = 202, tags = ["Games"])
 async def update_turn (game_id : int , db: Session = Depends(get_db)) : 
     game = db.query(Game).where(Game.game_id == game_id).first()
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
     if game.current_turn < game.players_amount : 
         game.current_turn += 1 
     else : 
