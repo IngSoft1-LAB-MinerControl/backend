@@ -3,7 +3,7 @@ from fastapi import HTTPException
 import pytest
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
-from src.database.models import Game, Player, Card, Secrets # Importa tus modelos
+from src.database.models import Game, Player, Card, Event, Secrets # Importa tus modelos
 from src.database.services.services_websockets import broadcast_available_games, broadcast_game_information, broadcast_last_discarted_cards, broadcast_lobby_information
 
 pytestmark = pytest.mark.asyncio
@@ -142,27 +142,50 @@ async def test_broadcast_last_discarted_cards_success(mock_session_local, mock_g
     mock_session_local.return_value = mock_db_session
     player_id = 1
     game_id = 10
-    mock_player = Player(player_id=player_id, name="Jugador 1",game_id = game_id,host = True, turn_order=2,birth_date = datetime.date(2000, 1, 1), cards=[], secrets=[])
+    mock_player = Player(player_id=player_id, name="Jugador 1",game_id = game_id,host = True, turn_order=2,birth_date = datetime.date(2000, 1, 1), cards=[], secrets=[], sets = [])
     mock_cards = [
-        Card(card_id=101, type="Accion", game_id=game_id,player_id= player_id, dropped=True,picked_up = True,draft = False ,discardInt=5),
-        Card(card_id=102, type="Accion", game_id=game_id,player_id = player_id, dropped=True,picked_up = True ,draft = False,discardInt=4)
+        Event(card_id=101, type="event", game_id=game_id,player_id= player_id, dropped=True,picked_up = True,draft = False ,discardInt=5, name = "Dead card folly"),
+        Event(card_id=102, type="event", game_id=game_id,player_id = player_id, dropped=True,picked_up = True ,draft = False,discardInt=4, name = "Point your suspicions")
     ]
     # Configurar la cadena de llamadas para encontrar al jugador
-    mock_db_session.query.return_value.filter.return_value.first.return_value = mock_player
-    # Configurar la cadena de llamadas para encontrar las cartas
-    (mock_db_session.query.return_value.filter.return_value
-     .order_by.return_value.limit.return_value.all.return_value) = mock_cards
+    mock_player_query_first = MagicMock()
+    mock_player_query_first.filter.return_value.first.return_value = mock_player
+    
+    # Preparar el mock para la TERCERA llamada a query: db.query(Player).all()
+    mock_player_query_all = MagicMock()
+    mock_player_query_all.options.return_value.filter.return_value.all.return_value = [mock_player]
+    
+    # Asignar los mocks en secuencia para el método .query()
+    mock_db_session.query.side_effect = [
+        mock_player_query_first,
+        mock_player_query_all
+    ]
+    
+    # Preparar el mock para la SEGUNDA llamada a la DB: db.execute(stmt)
+    mock_execute_result = MagicMock()
+    mock_execute_result.scalars.return_value.all.return_value = mock_cards
+    mock_db_session.execute.return_value = mock_execute_result
 
     # 2. Act
     await broadcast_last_discarted_cards(player_id)
 
     # 3. Assert
-    mock_game_manager.broadcast.assert_awaited_once()
-    call_args, _ = mock_game_manager.broadcast.await_args
-    sent_data = json.loads(call_args[0])
-    assert call_args[1] == game_id
-    assert sent_data['type'] == 'droppedCards'
-    assert len(sent_data['data']) == 2
+    assert mock_game_manager.broadcast.await_count == 2
+
+    calls = mock_game_manager.broadcast.await_args_list
+
+    # Primera llamada: playersState
+    call1_args = calls[0].args
+    data1 = json.loads(call1_args[0])
+    assert data1['type'] == 'playersState'
+    assert call1_args[1] == game_id # Verifica el game_id
+
+    # Segunda llamada: droppedCards
+    call2_args = calls[1].args
+    data2 = json.loads(call2_args[0])
+    assert data2['type'] == 'droppedCards'
+    assert len(data2['data']) == 2
+    assert call2_args[1] == game_id # Verifica el game_id
     
 
 @patch('src.database.services.services_websockets.gameManager', new_callable=AsyncMock)
@@ -172,19 +195,20 @@ async def test_broadcast_last_discarted_cards_no_cards_found(mock_session_local,
     mock_session_local.return_value = mock_db_session
     player_id = 1
     game_id = 10
-    mock_player = Player(player_id=player_id, name="Jugador 1",game_id = game_id,host = True, turn_order=2,birth_date = datetime.date(2000, 1, 1), cards=[], secrets=[])
+    mock_player = Player(player_id=player_id, name="Jugador 1",game_id = game_id,host = True, turn_order=2,birth_date = datetime.date(2000, 1, 1), cards=[], secrets=[],sets = [])
+        # Configura los diferentes resultados para las llamadas a la DB
+     # Configura el mock para la primera llamada a la DB: db.query(Player)
     mock_db_session.query.return_value.filter.return_value.first.return_value = mock_player
-    # Configuramos para que la búsqueda de cartas devuelva una lista vacía
-    (mock_db_session.query.return_value.filter.return_value
-     .order_by.return_value.limit.return_value.all.return_value) = []
 
-    # 2. Act & 3. Assert
-    # Verificamos que la función lanza la excepción esperada
+    # Configura el mock para la segunda llamada a la DB: db.execute(stmt)
+    mock_execute_result = MagicMock()
+    # La clave es devolver una lista vacía aquí para simular que no se encontraron cartas
+    mock_execute_result.scalars.return_value.all.return_value = [] 
+    mock_db_session.execute.return_value = mock_execute_result
+
+    # 2. Act & 3. Assert (el resto de la prueba no cambia)
     with pytest.raises(HTTPException) as exc_info:
         await broadcast_last_discarted_cards(player_id)
     
-    # Opcional: verificar detalles de la excepción
     assert exc_info.value.status_code == 404
-    
-    # Muy importante: verificar que no se intentó hacer un broadcast
     mock_game_manager.broadcast.assert_not_awaited()
