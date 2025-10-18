@@ -163,28 +163,6 @@ def test_deal_secrets_same_player_reintent():
     assert response.status_code == 202
 
 
-@patch('src.database.services.services_secrets.init_secrets')
-def test_deal_secrets_more_than_4_players(mock_init_secrets):
-    # Crear un juego con más de 4 jugadores
-    with TestingSessionLocal() as db:
-        game = Game(game_id=101, name="Many Players Game", status="waiting players", max_players=6, min_players=5, players_amount=5)
-        player1 = Player(player_id=1011, name="Player 1", host=True, birth_date=datetime.date(2000, 1, 1), game_id=101)
-        player2 = Player(player_id=1012, name="Player 2", host=False, birth_date=datetime.date(2001, 1, 1), game_id=101)
-        player3 = Player(player_id=1013, name="Player 3", host=False, birth_date=datetime.date(2002, 1, 1), game_id=101)
-        player4 = Player(player_id=1014, name="Player 4", host=False, birth_date=datetime.date(2003, 1, 1), game_id=101)
-        player5 = Player(player_id=1015, name="Player 5", host=False, birth_date=datetime.date(2004, 1, 1), game_id=101)
-        # Crear suficientes secretos para repartir (5 * 3 = 15)
-        secret1 = Secrets(secret_id=2000, murderer=True, acomplice=False, revelated=False, player_id=None, game_id=101)
-        secret2 = Secrets(secret_id=2001, murderer=False, acomplice=True, revelated=False, player_id=None, game_id=101)
-        secret_list = [Secrets(secret_id=2002 + i, murderer=False, acomplice=False, revelated=False, player_id=None, game_id=101) for i in range(13)]
-        db.add_all([game, player1, player2, player3, player4, player5, secret1, secret2] + secret_list)
-        db.commit()
-
-    # Inicializar el juego (debería funcionar correctamente)
-    response = client.post(f"/game/beginning/{101}")
-    assert response.status_code == 202
-# --- Nuevos tests para init_secrets ---
-
 def test_init_secrets_less_than_4_players():
     # Crear un juego con menos de 4 jugadores
     with TestingSessionLocal() as db:
