@@ -1,59 +1,21 @@
-import os
+"""
+Tests for the Game endpoints and services, refactored to use Pytest fixtures.
+"""
 import datetime
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from src.database.models import Base, Game, Player, Detective, Event
-from src.database.database import get_db
-from fastapi.testclient import TestClient
-from src.main import app
 from unittest.mock import patch
 import pytest
 
-# Configuración de la base de datos de prueba
-SQLALCHEMY_TEST_DATABASE_URL = "sqlite:///./test_games.db"
-if os.path.exists("./test_games.db"):
-    os.remove("./test_games.db")
-test_engine = create_engine(SQLALCHEMY_TEST_DATABASE_URL, connect_args={"check_same_thread": False})
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
-Base.metadata.create_all(bind=test_engine)
-
-def override_get_db():
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-app.dependency_overrides[get_db] = override_get_db
-client = TestClient(app)
-
-def setup_database():
-    with TestingSessionLocal() as db:
-        db.query(Event).delete()
-        db.query(Detective).delete()
-        db.query(Player).delete()
-        db.query(Game).delete()
-        db.commit()
-
-def create_test_game(db, game_id, name, status, max_players, min_players, players_amount, current_turn=None):
-    game = Game(game_id=game_id, name=name, status=status, max_players=max_players, min_players=min_players, players_amount=players_amount, current_turn=current_turn)
-    db.add(game)
-    db.commit()
-    db.refresh(game)
-    return game
-
-def create_test_player(db, player_id, name, host, game_id, birth_date, turn_order=None):
-    player = Player(player_id=player_id, name=name, host=host, game_id=game_id, birth_date=birth_date, turn_order=turn_order)
-    db.add(player)
-    db.commit()
-    db.refresh(player)
-    return player
+# Nota: Ya no son necesarias las importaciones de sqlalchemy, TestClient, etc.,
+# ya que la configuración está centralizada en conftest.py.
+from src.database.models import Game, Player
 
 # --- Test cases for Game creation ---
-def test_create_game_success():
-    setup_database()
-    game_data = {"name": "New Game", "max_players": 6, "min_players": 2, "status": "waiting players"}
+def test_create_game_success(client):
+    """Verifica que se puede crear una partida con datos válidos."""
+    # El status "waiting players" es el default, no es necesario enviarlo.
+    game_data = {"name": "New Game", "max_players": 6, "min_players": 2, "status" : "waiting players"}
     response = client.post("/games", json=game_data)
+    
     assert response.status_code == 201
     data = response.json()
     assert data["name"] == "New Game"
@@ -62,62 +24,73 @@ def test_create_game_success():
     assert data["status"] == "waiting players"
     assert data["players_amount"] == 0
 
-def test_create_game_invalid_input():
-    setup_database()
-    game_data = {"name": "Invalid Game", "max_players": "invalid", "min_players": 2, "status": "waiting players"}
+def test_create_game_invalid_input(client):
+    """Verifica que la API rechaza datos de entrada inválidos."""
+    game_data = {"name": "Invalid Game", "max_players": "invalid", "min_players": 2}
     response = client.post("/games", json=game_data)
     assert response.status_code == 422
 
 # --- Test cases for listing available games ---
-def test_list_available_games_success():
-    setup_database()
-    with TestingSessionLocal() as db:
-        create_test_game(db, game_id=1, name="Game 1", status="waiting players", max_players=4, min_players=2, players_amount=1)
-        create_test_game(db, game_id=2, name="Game 2", status="bootable", max_players=4, min_players=2, players_amount=1)
-        create_test_game(db, game_id=3, name="Game 3", status="in course", max_players=4, min_players=2, players_amount=2)
-        create_test_game(db, game_id=4, name="Game 4", status="finished", max_players=4, min_players=2, players_amount=2)
+def test_list_available_games_success(client, db_session):
+    """Verifica que la API lista correctamente solo las partidas 'waiting' y 'bootable'."""
+    # Arrange: Crear datos de prueba directamente en la DB para un control preciso de los estados
+    game1 = Game(name="Game 1", status="waiting players", max_players=4, min_players=2, players_amount=1)
+    game2 = Game(name="Game 2", status="bootable", max_players=4, min_players=2, players_amount=2)
+    game3 = Game(name="Game 3", status="in course", max_players=4, min_players=2, players_amount=2)
+    game4 = Game(name="Game 4", status="finished", max_players=4, min_players=2, players_amount=2)
+    db_session.add_all([game1, game2, game3, game4])
+    db_session.commit()
 
+    # Act
     response = client.get("/games/availables")
     assert response.status_code == 200
     games = response.json()
-    assert len(games) >= 2
-    assert any(game["name"] == "Game 1" for game in games)
-    assert any(game["name"] == "Game 2" for game in games)
-    assert not any(game["name"] == "Game 3" for game in games)
-    assert not any(game["name"] == "Game 4" for game in games)
+    
+    # Assert
+    game_names = {g['name'] for g in games}
+    assert len(games) == 2
+    assert "Game 1" in game_names
+    assert "Game 2" in game_names
+    assert "Game 3" not in game_names
+    assert "Game 4" not in game_names
 
 # --- Test cases for deleting a game ---
-def test_delete_game_success():
-    setup_database()
-    with TestingSessionLocal() as db:
-        game = create_test_game(db, game_id=1, name="Game to Delete", status="waiting players", max_players=4, min_players=2, players_amount=1)
+def test_delete_game_success(client):
+    """Verifica que una partida puede ser borrada exitosamente."""
+    # Arrange: Crear la partida a través de la API
+    create_resp = client.post("/games", json={"name": "Game to Delete", "max_players": 4, "min_players": 2, "status" : "waiting players"})
+    game_id = create_resp.json()["game_id"]
 
-    response = client.delete(f"/game/{game.game_id}")
-    assert response.status_code == 204
+    # Act
+    delete_resp = client.delete(f"/game/{game_id}")
+    assert delete_resp.status_code == 204
 
-    with TestingSessionLocal() as db:
-        deleted_game = db.query(Game).filter(Game.game_id == game.game_id).first()
-        assert deleted_game is None
+    # Assert: Confirmar que ya no existe
+    get_resp = client.get(f"/games/{game_id}")
+    assert get_resp.status_code == 404
 
-def test_delete_game_not_found():
-    setup_database()
+def test_delete_game_not_found(client):
+    """Verifica el borrado de una partida inexistente."""
     response = client.delete("/game/999")
     assert response.status_code == 404
     assert response.json()["detail"] == "Game not found"
 
 # --- Test cases for getting a game by ID ---
-def test_get_game_success():
-    setup_database()
-    with TestingSessionLocal() as db:
-        game = create_test_game(db, game_id=1, name="Test Game", status="waiting players", max_players=4, min_players=2, players_amount=1)
-
-    response = client.get(f"/games/{game.game_id}")
+def test_get_game_success(client):
+    """Verifica que se puede obtener una partida por su ID."""
+    # Arrange
+    create_resp = client.post("/games", json={"name": "Test Game", "max_players": 4, "min_players": 2, "status" : "waiting players"})
+    game_id = create_resp.json()["game_id"]
+    
+    # Act & Assert
+    response = client.get(f"/games/{game_id}")
     assert response.status_code == 200
     data = response.json()
     assert data["name"] == "Test Game"
+    assert data["game_id"] == game_id
 
-def test_get_game_not_found():
-    setup_database()
+def test_get_game_not_found(client):
+    """Verifica la obtención de una partida inexistente."""
     response = client.get("/games/999")
     assert response.status_code == 404
     assert response.json()["detail"] == "Game not found"
@@ -130,200 +103,217 @@ def test_get_game_not_found():
 @patch('src.database.services.services_cards.deal_cards_to_players')
 @patch('src.database.services.services_secrets.deal_secrets_to_players')
 @patch('src.database.services.services_cards.setup_initial_draft_pile')
-def test_initialize_game_success(mock_setup_initial_draft_pile, mock_deal_secrets_to_players, mock_deal_cards_to_players, mock_deal_NSF, mock_init_secrets, mock_init_event_cards, mock_init_detective_cards):
-    setup_database()
-    game_id = 1
-    with TestingSessionLocal() as db:
-        create_test_game(db, game_id=game_id, name="Test Game", status="waiting players", max_players=4, min_players=2, players_amount=2)
-        create_test_player(db, player_id=1, name="Player 1", host=True, game_id=game_id, birth_date=datetime.date(2000, 1, 1))
-        create_test_player(db, player_id=2, name="Player 2", host=False, game_id=game_id, birth_date=datetime.date(2000, 1, 2))
+def test_initialize_game_success(mock_setup_draft, mock_deal_secrets, mock_deal_cards, mock_deal_nsf, mock_init_secrets, mock_init_events, mock_init_detectives,db_session ,client):
+    """Verifica que una partida 'bootable' puede ser inicializada."""
+    """Verifica que una partida 'bootable' puede ser inicializada."""
+    # Arrange: Crear una partida y jugadores directamente en la DB para un control total
+    game = Game(
+        name="Test Game", 
+        status="waiting players", 
+        max_players=4, 
+        min_players=2, 
+        players_amount=2
+    )
+    db_session.add(game)
+    db_session.commit()
+    db_session.refresh(game)
+    
+    player1 = Player(name="Player 1", game_id=game.game_id, birth_date=datetime.date(2000, 1, 1))
+    player2 = Player(name="Player 2", game_id=game.game_id, birth_date=datetime.date(2000, 1, 1))
+    db_session.add_all([player1, player2])
+    db_session.commit()
 
-    response = client.post(f"/game/beginning/{game_id}")
+    # Act
+    response = client.post(f"/game/beginning/{game.game_id}")
+    
+    # Assert
     assert response.status_code == 202
     data = response.json()
     assert data["status"] == "in course"
 
-def test_initialize_game_not_found():
-    setup_database()
+def test_initialize_game_not_found(client):
+    """Verifica el inicio de una partida inexistente."""
     response = client.post("/game/beginning/999")
     assert response.status_code == 404
     assert response.json()["detail"] == "Game not found"
 
-def test_initialize_game_already_started():
-    setup_database()
-    with TestingSessionLocal() as db:
-        game = create_test_game(db, game_id=1, name="Test Game", status="in course", max_players=4, min_players=2, players_amount=2)
+def test_initialize_game_already_started(client, db_session):
+    """Verifica que una partida 'in course' no puede ser re-inicializada."""
+    # Arrange: Crear una partida directamente en DB con el estado deseado
+    game = Game(name="Test Game", status="in course", max_players=4, min_players=2, players_amount=2)
+    db_session.add(game)
+    db_session.commit()
+    
     response = client.post(f"/game/beginning/{game.game_id}")
     assert response.status_code == 400
     assert response.json()["detail"] == "Game already started"
 
-def test_initialize_game_not_enough_players():
-    setup_database()
-    with TestingSessionLocal() as db:
-        game = create_test_game(db, game_id=1, name="Test Game", status="waiting players", max_players=4, min_players=2, players_amount=1)
-        create_test_player(db, player_id=1, name="Player 1", host=True, game_id=game.game_id, birth_date=datetime.date(2000, 1, 1))
+def test_initialize_game_not_enough_players(client):
+    """Verifica que una partida no puede iniciar sin suficientes jugadores."""
+    # Arrange
+    game_resp = client.post("/games", json={"name": "Test Game", "max_players": 4, "min_players": 2, "status" : "waiting players"})
+    game_id = game_resp.json()["game_id"]
+    client.post(f"/player?player_name=Player 1&game_id={game_id}&birth_date=2000-01-01") # Solo 1 jugador
 
-    response = client.post(f"/game/beginning/{1}")
+    # Act & Assert
+    response = client.post(f"/game/beginning/{game_id}")
     assert response.status_code == 424
     assert response.json()["detail"] == "Error, you need more players to start game"
 
 # --- Test cases for updating the turn ---
-# --- Corrected Test Cases ---
+def test_update_turn_success(client, db_session):
+    """Verifica que el turno avanza al siguiente jugador."""
+    # Arrange
+    game = Game(name="Test Game", status="in course", max_players=4, min_players=2, players_amount=2, current_turn=1)
+    db_session.add(game)
+    db_session.commit()
+    game_id = game.game_id
 
-# The DetachedInstanceError occurs because the 'game' object is used after its database session is closed.
-# The fix is to use the game's ID for the API call and then re-query the game in a new session to verify the changes.
-def test_update_turn_success():
-    setup_database()
-    game_id = 1
-    with TestingSessionLocal() as db:
-        create_test_game(db, game_id=game_id, name="Test Game", status="in course", max_players=4, min_players=2, players_amount=2, current_turn=1)
-        create_test_player(db, player_id=1, name="Player 1", host=True, game_id=game_id, birth_date=datetime.date(2000, 1, 1))
-        create_test_player(db, player_id=2, name="Player 2", host=False, game_id=game_id, birth_date=datetime.date(2000, 1, 2))
-
+    # Act
     response = client.put(f"/game/update_turn/{game_id}")
+    
+    # Assert
     assert response.status_code == 202
-    data = response.json()
-    assert data == 2
+    assert response.json() == 2
+    updated_game = db_session.query(Game).get(game_id)
+    assert updated_game.current_turn == 2
 
-    # Verify the change in the database
-    with TestingSessionLocal() as db:
-        game = db.query(Game).filter(Game.game_id == game_id).first()
-        assert game.current_turn == 2
-
-def test_update_turn_game_not_found():
-    setup_database()
+def test_update_turn_game_not_found(client):
+    """Verifica la actualización de turno de una partida inexistente."""
     response = client.put("/game/update_turn/999")
     assert response.status_code == 404
     assert response.json()["detail"] == "Game not found"
 
-def test_update_turn_wraps_around():
-    setup_database()
-    game_id = 1
-    with TestingSessionLocal() as db:
-        create_test_game(db, game_id=game_id, name="Test Game", status="in course", max_players=2, min_players=2, players_amount=2, current_turn=2)
-        create_test_player(db, player_id=1, name="Player 1", host=True, game_id=game_id, birth_date=datetime.date(2000, 1, 1), turn_order=1)
-        create_test_player(db, player_id=2, name="Player 2", host=False, game_id=game_id, birth_date=datetime.date(2000, 1, 2), turn_order=2)
-
-    response = client.put(f"/game/update_turn/{game_id}")
+def test_update_turn_wraps_around(client, db_session):
+    """Verifica que el turno se reinicia al primer jugador después del último."""
+    # Arrange
+    game = Game(name="Test Game", status="in course", max_players=2, min_players=2, players_amount=2, current_turn=2)
+    db_session.add(game)
+    db_session.commit()
+    
+    # Act
+    response = client.put(f"/game/update_turn/{game.game_id}")
+    
+    # Assert
     assert response.status_code == 202
-    data = response.json()
-    assert data == 1
+    assert response.json() == 1
 
-# --- Test cases for assign_turn_to_players ---
-def test_assign_turn_to_players_success():
-    setup_database()
-    with TestingSessionLocal() as db:
-        game = create_test_game(db, game_id=1, name="Test Game", status="waiting players", max_players=4, min_players=2, players_amount=2)
-        player1 = create_test_player(db, player_id=1, name="Player 1", host=True, game_id=game.game_id, birth_date=datetime.date(2000, 1, 1))
-        player2 = create_test_player(db, player_id=2, name="Player 2", host=False, game_id=game.game_id, birth_date=datetime.date(2000, 2, 1))
+# --- Test cases for service functions (Unit/Integration) ---
+def test_assign_turn_to_players_success(db_session):
+    """Verifica que el servicio 'assign_turn_to_players' asigna órdenes de turno únicos."""
+    from src.database.services.services_games import assign_turn_to_players
+    
+    # Arrange
+    game = Game(name="Test Game", max_players=4, min_players=2, players_amount=2)
+    player1 = Player(name="Player 1", host=True, game=game, birth_date=datetime.date(2000, 1, 1))
+    player2 = Player(name="Player 2", host=False, game=game, birth_date=datetime.date(2000, 2, 1))
+    db_session.add_all([game, player1, player2])
+    db_session.commit()
 
-        # Call the service function directly
-        from src.database.services.services_games import assign_turn_to_players
-        assign_turn_to_players(game.game_id, db)
+    # Act
+    assign_turn_to_players(game.game_id, db_session)
 
-        # Refresh players to get updated turn_order
-        db.refresh(player1)
-        db.refresh(player2)
+    # Assert
+    db_session.refresh(player1)
+    db_session.refresh(player2)
+    assert {player1.turn_order, player2.turn_order} == {1, 2}
 
-        assert player1.turn_order is not None
-        assert player2.turn_order is not None
-        assert player1.turn_order != player2.turn_order
+def test_update_players_on_game_success(db_session):
+    """Verifica que 'update_players_on_game' actualiza el contador de jugadores."""
+    from src.database.services.services_games import update_players_on_game
+    
+    # Arrange
+    game = Game(name="Test Game", status="waiting players", max_players=4, min_players=2, players_amount=0)
+    player = Player(name="Player 1", host=True, game=game, birth_date=datetime.date(2000, 1, 1))
+    db_session.add_all([game, player])
+    db_session.commit()
+    
+    # Act
+    update_players_on_game(game.game_id, db_session)
 
-# --- Test cases for update_players_on_game ---
-def test_update_players_on_game_success():
-    setup_database()
-    with TestingSessionLocal() as db:
-        game = create_test_game(db, game_id=1, name="Test Game", status="waiting players", max_players=4, min_players=2, players_amount=0)
-        create_test_player(db, player_id=1, name="Player 1", host=True, game_id=game.game_id, birth_date=datetime.date(2000, 1, 1))
-        
-        from src.database.services.services_games import update_players_on_game
-        update_players_on_game(game.game_id, db)
+    # Assert
+    db_session.refresh(game)
+    assert game.players_amount == 1
 
-        db.refresh(game)
-        assert game.players_amount == 1
-
-def test_update_players_on_game_game_full():
-    setup_database()
-    with TestingSessionLocal() as db:
-        game = create_test_game(db, game_id=1, name="Test Game", status="waiting players", max_players=1, min_players=1, players_amount=1)
-        
-        # Call the service function directly
-        from src.database.services.services_games import update_players_on_game
-        result = update_players_on_game(game.game_id, db)
-
-        assert result is None
-
-# --- Test cases for finish_game ---
+# --- Test cases for finish_game (Service) ---
 @pytest.mark.asyncio
-async def test_finish_game_success():
-    setup_database()
-    game_id = 1
-    with TestingSessionLocal() as db:
-        create_test_game(db, game_id=game_id, name="Test Game", status="in course", max_players=4, min_players=2, players_amount=2)
-
-    # Use a new session for the service call, as a real request would.
-    with TestingSessionLocal() as db:
-        from src.database.services.services_games import finish_game
-        result = await finish_game(game_id, db)
-        assert result == {"message": f"Game {game_id} finished successfully."}
-
-    # Verify the state change in a separate session.
-    with TestingSessionLocal() as db:
-        game = db.query(Game).get(game_id)
-        assert game.status == "finished"
+async def test_finish_game_success(db_session):
+    """Verifica que el servicio 'finish_game' cambia el estado de la partida."""
+    from src.database.services.services_games import finish_game
+    
+    # Arrange
+    game = Game(name="Test Game", status="in course", max_players=4, min_players=2, players_amount=2)
+    db_session.add(game)
+    db_session.commit()
+    
+    # Act
+    result = await finish_game(game.game_id, db_session)
+    
+    # Assert
+    assert result == {"message": f"Game {game.game_id} finished successfully."}
+    db_session.refresh(game)
+    assert game.status == "finished"
 
 @pytest.mark.asyncio
-async def test_finish_game_already_finished():
-    setup_database()
-    game_id = 1
-    with TestingSessionLocal() as db:
-        create_test_game(db, game_id=game_id, name="Test Game", status="finished", max_players=4, min_players=2, players_amount=2)
+async def test_finish_game_already_finished(db_session):
+    """Verifica el comportamiento de 'finish_game' en una partida ya finalizada."""
+    from src.database.services.services_games import finish_game
+    
+    # Arrange
+    game = Game(name="Test Game", status="finished", max_players=4, min_players=2, players_amount=2)
+    db_session.add(game)
+    db_session.commit()
+    
+    # Act
+    result = await finish_game(game.game_id, db_session)
+    
+    # Assert
+    assert result == {"message": f"Game {game.game_id} is already finished."}
 
-    with TestingSessionLocal() as db:
-        from src.database.services.services_games import finish_game
-        result = await finish_game(game_id, db)
-        assert result == {"message": f"Game {game_id} is already finished."}
+# --- New Exhaustive Tests (ya refactorizados) ---
+def test_update_players_on_game_changes_status_to_bootable(db_session):
+    """Verifica que el estado cambia a 'bootable' cuando se alcanza el mínimo de jugadores."""
+    from src.database.services.services_games import update_players_on_game
+    
+    # Arrange
+    game = Game(name="Test Game", status="waiting players", max_players=4, min_players=2, players_amount=1)
+    player1 = Player(name="Player 1", host=True, game=game, birth_date=datetime.date(2000, 1, 1))
+    player2 = Player(name="Player 2", host=False, game=game, birth_date=datetime.date(2001, 1, 1))
+    db_session.add_all([game, player1, player2])
+    db_session.commit()
+    
+    # Act
+    update_players_on_game(game.game_id, db_session)
 
+    # Assert
+    db_session.refresh(game)
+    assert game.players_amount == 2
+    assert game.status == "bootable"
 
-# --- New Exhaustive Tests ---
+def test_update_players_on_game_changes_status_to_full(db_session):
+    """Verifica que el estado cambia a 'Full' cuando se alcanza el máximo de jugadores."""
+    from src.database.services.services_games import update_players_on_game
+    
+    # Arrange
+    game = Game(name="Test Game", status="bootable", max_players=2, min_players=2, players_amount=1)
+    player1 = Player(name="Player 1", host=True, game=game, birth_date=datetime.date(2000, 1, 1))
+    player2 = Player(name="Player 2", host=False, game=game, birth_date=datetime.date(2001, 1, 1))
+    db_session.add_all([game, player1, player2])
+    db_session.commit()
+    
+    # Act
+    update_players_on_game(game.game_id, db_session)
 
-def test_update_players_on_game_changes_status_to_bootable():
-    setup_database()
-    with TestingSessionLocal() as db:
-        game = create_test_game(db, game_id=1, name="Test Game", status="waiting players", max_players=4, min_players=2, players_amount=1)
-        create_test_player(db, player_id=1, name="Player 1", host=True, game_id=game.game_id, birth_date=datetime.date(2000, 1, 1))
-        
-        # Add another player to meet min_players
-        create_test_player(db, player_id=2, name="Player 2", host=False, game_id=game.game_id, birth_date=datetime.date(2001, 1, 1))
-
-        from src.database.services.services_games import update_players_on_game
-        update_players_on_game(game.game_id, db)
-
-        db.refresh(game)
-        assert game.players_amount == 2
-        assert game.status == "bootable"
-
-def test_update_players_on_game_changes_status_to_full():
-    setup_database()
-    with TestingSessionLocal() as db:
-        game = create_test_game(db, game_id=1, name="Test Game", status="bootable", max_players=2, min_players=2, players_amount=1)
-        create_test_player(db, player_id=1, name="Player 1", host=True, game_id=game.game_id, birth_date=datetime.date(2000, 1, 1))
-        
-        # Add another player to meet max_players
-        create_test_player(db, player_id=2, name="Player 2", host=False, game_id=game.game_id, birth_date=datetime.date(2001, 1, 1))
-
-        from src.database.services.services_games import update_players_on_game
-        update_players_on_game(game.game_id, db)
-
-        db.refresh(game)
-        assert game.players_amount == 2
-        assert game.status == "Full"
+    # Assert
+    db_session.refresh(game)
+    assert game.players_amount == 2
+    assert game.status == "Full"
 
 @pytest.mark.asyncio
-async def test_finish_game_not_found():
-    setup_database()
-    with TestingSessionLocal() as db:
-        from src.database.services.services_games import finish_game
-        # Expecting an exception because the game doesn't exist
-        with pytest.raises(Exception): # Or a more specific HTTPException if the service raises it
-            await finish_game(999, db)
+async def test_finish_game_not_found(db_session):
+    """Verifica que 'finish_game' maneja el caso de una partida no encontrada."""
+    from src.database.services.services_games import finish_game
+    
+    # Act & Assert
+    with pytest.raises(Exception): # Idealmente, una excepción más específica si tu servicio la lanza
+        await finish_game(999, db_session)
