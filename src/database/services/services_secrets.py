@@ -122,6 +122,8 @@ def steal_secret(target_player_id: int, secret_id: int, db: Session):
     secret = db.query(Secrets).filter(Secrets.secret_id == secret_id).first()
     if not secret:
         raise HTTPException(status_code=404, detail="Secret not found")
+    if not secret.revelated:
+        raise HTTPException(status_code=400, detail="Secret must be revealed to be stolen")
     new_owner = db.query(Player).filter(Player.player_id == target_player_id).first()
     if not new_owner:
         raise HTTPException(status_code=404, detail="Player not found")
