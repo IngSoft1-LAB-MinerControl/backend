@@ -24,7 +24,7 @@ def cards_off_table(player_id: int, db: Session):
         db.commit() # se descartan las cartas nsf del jugador
     except Exception as e:
         db.rollback() 
-        raise HTTPException(status_code=500, detail=f"Error discarding 'Not so fast' cards: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Error discarding 'Not so fast' cards: {str(e)}")
 
 def look_into_ashes(player_id: int, card_id: int, db: Session):
     """
@@ -54,17 +54,14 @@ def one_more(receive_secret_player_id: int, secret_id: int, db: Session):
     including your own. This may remove social disgrace.
     """
     try:
-        stolen_secret = steal_secret_service(
-            receive_secret_player_id=receive_secret_player_id, # El jugador que recibe el secreto
-            secret_id=secret_id,
-        )
+        stolen_secret = steal_secret_service(receive_secret_player_id, secret_id, db)
         return stolen_secret
     except HTTPException as e:
         # Re-lanzar excepciones específicas de steal_secret si es necesario
         raise e
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error executing 'One More' event: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Error executing 'One More' event: {str(e)}")
 
 
 # def delay_the_murderers_escape(game_id: int, player_id: int, cards_to_return_ids: List[int], db: Session):
@@ -123,15 +120,17 @@ def early_train_paddington(game_id: int, db: Session):
     
     random.shuffle(deck)
     max_discardInt = db.query(func.max(Card.discardInt)).filter(Card.game_id == game_id).scalar() or 0
-    for card in deck[:6]:
+    cards_to_discard = deck[:6]
+    for card in cards_to_discard:
         card.dropped = True
         card.picked_up = False
         max_discardInt += 1
         card.discardInt = max_discardInt # Asigna el siguiente valor en la secuencia
     try:
         db.commit()
-        db.refresh(deck)
+        for card in cards_to_discard:
+            db.refresh(card)
         return {"message": "Early Train to Paddington event executed successfully."}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error executing 'Early Train to Paddington' event: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Error executing 'Early Train to Paddington' event: {str(e)}")

@@ -45,7 +45,7 @@ async def activate_one_more_event(new_secret_player_id: int, secret_id: int, db:
     if not secret:
         raise HTTPException(status_code=404, detail="Secret not found or is not revealed.")
 
-    updated_secret = one_more(new_secret_player_id=new_secret_player_id, secret_id=secret_id, db=db)
+    updated_secret = one_more(new_secret_player_id, secret_id, db=db)
     await broadcast_game_information(new_secret_player.game_id)
     return updated_secret
 
@@ -76,7 +76,7 @@ async def activate_look_into_ashes_event(player_id: int, card_id: int, db: Sessi
         raise HTTPException(status_code=404, detail="Card not found.")
     
     taken_card = look_into_ashes(player_id=player_id, card_id=card_id, db=db)
-    await broadcast_game_information(card.game_id)
-    await broadcast_last_discarted_cards(player_id)
+    await broadcast_game_information(player.game_id)
+    await broadcast_last_discarted_cards(player.game_id)
     return taken_card
 
