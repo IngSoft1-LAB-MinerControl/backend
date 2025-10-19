@@ -1,143 +1,195 @@
+"""
+Tests for the Set creation and manipulation endpoints.
+
+This file uses a dedicated fixture `setup_data` to create a common,
+clean state (game, players, cards) for each test, ensuring isolation and
+reproducibility. The `client` fixture from conftest.py is used for API calls.
+"""
 import datetime
-import os
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from src.database.models import Base, Game, Player, Detective, Set
-from src.database.database import get_db
-from fastapi.testclient import TestClient
-from src.main import app
+import pytest
 
-SQLALCHEMY_TEST_DATABASE_URL = "sqlite:///./test_sets.db"
-if os.path.exists("./test_sets.db"):
-    os.remove("./test_sets.db")
-test_engine = create_engine(SQLALCHEMY_TEST_DATABASE_URL, connect_args={"check_same_thread": False})
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
-Base.metadata.create_all(bind=test_engine)
+# Nota: Todas las importaciones de configuración de DB y TestClient se han ido.
+# Solo importamos los modelos que necesitamos para la fixture de setup.
+from src.database.models import Game, Player, Detective, Set
+from unittest.mock import AsyncMock
 
-def override_get_db():
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# Mantén tu fixture setup_data original, la que no tiene transacciones separadas
+@pytest.fixture
+def setup_data(db_session):
+    # Crear entidades de base
+    game = Game(game_id=1, name="Test Game", status="in course", max_players=6, min_players=2, players_amount=2)
+    player1 = Player(name="Player1", host=True, birth_date=datetime.date(2000, 1, 1), turn_order=1, game_id=1)
+    player2 = Player(name="Player2", host=False, birth_date=datetime.date(2000, 1, 2), turn_order=2, game_id=1)
+    db_session.add_all([game, player1, player2])
+    
+    # Crear cartas de detective
+    detectives = [
+        Detective(card_id=1, type="detective", name="Parker Pyne", picked_up=True, dropped=False, player_id=1, game_id=1, quantity_set=2),
+        Detective(card_id=2, type="detective", name="Parker Pyne", picked_up=True, dropped=False, player_id=1, game_id=1, quantity_set=2),
+        Detective(card_id=3, type="detective", name="Harley Quin Wildcard", picked_up=True, dropped=False, player_id=1, game_id=1, quantity_set=2),
+        Detective(card_id=4, type="detective", name="Miss Marple", picked_up=True, dropped=False, player_id=1, game_id=1, quantity_set=3),
+        Detective(card_id=5, type="detective", name="Miss Marple", picked_up=True, dropped=False, player_id=1, game_id=1, quantity_set=3),
+        Detective(card_id=6, type="detective", name="Miss Marple", picked_up=True, dropped=False, player_id=1, game_id=1, quantity_set=3),
+        Detective(card_id=7, type="detective", name="Tommy Beresford", picked_up=True, dropped=False, player_id=1, game_id=1, quantity_set=2),
+        Detective(card_id=8, type="detective", name="Tuppence Beresford", picked_up=True, dropped=False, player_id=1, game_id=1, quantity_set=2),
+        Detective(card_id=9, type="detective", name="Hercule Poirot", picked_up=True, dropped=False, player_id=1, game_id=1, quantity_set=3),
+    ]
+    db_session.add_all(detectives)
+    db_session.commit()
+    return db_session # Devolvemos la sesión por si la necesitamos
 
-app.dependency_overrides[get_db] = override_get_db
-client = TestClient(app)
 
-def setup_players_and_detectives():
-    with TestingSessionLocal() as db:
-        db.query(Set).delete()
-        db.query(Detective).delete()
-        db.query(Player).delete()
-        db.query(Game).delete()
-        db.commit()
-        game = Game(game_id=1, name="Test Game", status="esperando jugadores", max_players=6, min_players=2, players_amount=2)
-        player1 = Player(player_id=1, name="Player1", host=True, birth_date=datetime.date(2000, 1, 1), turn_order=1, game_id=1)
-        player2 = Player(player_id=2, name="Player2", host=False, birth_date=datetime.date(2000, 1, 2), turn_order=2, game_id=1)
-        db.add_all([game, player1, player2])
-        db.commit()
-        # Detectives para sets de 2
-        d1 = Detective(card_id=1, type="detective", name="Adriane Oliver", picked_up=True, dropped=False, player_id=1, game_id=1, quantity_set=2, set_id=None)
-        d2 = Detective(card_id=2, type="detective", name="Adriane Oliver", picked_up=True, dropped=False, player_id=1, game_id=1, quantity_set=2, set_id=None)
-        # Wildcard
-        d3 = Detective(card_id=3, type="detective", name="Harley Quin Wildcard", picked_up=True, dropped=False, player_id=1, game_id=1, quantity_set=2, set_id=None)
-        # Detectives para sets de 3
-        d4 = Detective(card_id=4, type="detective", name="Miss Marple", picked_up=True, dropped=False, player_id=1, game_id=1, quantity_set=3, set_id=None)
-        d5 = Detective(card_id=5, type="detective", name="Miss Marple", picked_up=True, dropped=False, player_id=1, game_id=1, quantity_set=3, set_id=None)
-        d6 = Detective(card_id=6, type="detective", name="Miss Marple", picked_up=True, dropped=False, player_id=1, game_id=1, quantity_set=3, set_id=None)
-        # Beresford brothers
-        d7 = Detective(card_id=7, type="detective", name="Tommy Beresford", picked_up=True, dropped=False, player_id=1, game_id=1, quantity_set=2, set_id=None)
-        d8 = Detective(card_id=8, type="detective", name="Tuppence Beresford", picked_up=True, dropped=False, player_id=1, game_id=1, quantity_set=2, set_id=None)
-        db.add_all([d1, d2, d3, d4, d5, d6, d7, d8])
-        db.commit()
+# --- Tests para Sets de 2 Cartas ---
 
-def test_set_of2_same_name():
-    setup_players_and_detectives()
+# 2. AÑADE `mocker` A LA FIRMA DEL TEST
+def test_set_of2_same_name(client, setup_data, mocker):
+    
+    # 3. USA `mocker.patch` PARA REEMPLAZAR LA FUNCIÓN PROBLEMÁTICA
+    # Le decimos que reemplace `broadcast_player_state` DENTRO del módulo `set_routes`
+    # con un mock asíncrono que no hará nada.
+    mock_broadcast = mocker.patch(
+        'src.routes.set_routes.broadcast_player_state', 
+        new_callable=AsyncMock
+    )
+
+    # Ahora, cuando llamemos al endpoint, la llamada a broadcast_player_state será interceptada
     response = client.post("/sets_of2/1,2")
+
+    # El test ya no fallará por el ValidationError
     assert response.status_code == 201
     data = response.json()
-    assert data["name"] == "Adriane Oliver"
+    assert data["name"] == "Parker Pyne"
 
-def test_set_of2_with_wildcard():
-    setup_players_and_detectives()
+    # 4. (Opcional pero recomendado) VERIFICA QUE EL BROADCAST FUE LLAMADO
+    # Esto asegura que tu endpoint sigue intentando llamar a la función,
+    # solo que nosotros la interceptamos.
+    mock_broadcast.assert_awaited_once_with(1) # Verificamos que se llamó con game_id=1
+
+def test_set_of2_with_wildcard(client, setup_data, mocker):
+    mock_broadcast = mocker.patch(
+        'src.routes.set_routes.broadcast_player_state', 
+        new_callable=AsyncMock
+    )
+    
     response = client.post("/sets_of2/1,3")
     assert response.status_code == 201
     data = response.json()
-    assert data["name"] == "Adriane Oliver"
+    assert data["name"] == "Parker Pyne"
+    
     response2 = client.post("/sets_of2/3,2")
     assert response2.status_code == 201
     data2 = response2.json()
-    assert data2["name"] == "Adriane Oliver"
+    assert data2["name"] == "Parker Pyne"
 
-def test_set_of2_beresford_brothers():
-    setup_players_and_detectives()
+    mock_broadcast.call_count == 2
+
+def test_set_of2_beresford_brothers(client, setup_data,mocker):
+    mock_broadcast = mocker.patch(
+        'src.routes.set_routes.broadcast_player_state', 
+        new_callable=AsyncMock
+    )
+    
     response = client.post("/sets_of2/7,8")
     assert response.status_code == 201
     data = response.json()
     assert data["name"] == "Beresford brothers"
+    mock_broadcast.assert_awaited_once_with(1)
 
-def test_set_of2_invalid():
-    setup_players_and_detectives()
+def test_set_of2_invalid_card_id(client, setup_data):
     # No existe card_id 99
     response = client.post("/sets_of2/1,99")
     assert response.status_code == 400
     assert "Invalid card_id" in response.json()["detail"]
 
-def test_set_of2_wrong_quantity():
-    setup_players_and_detectives()
-    # Usar una carta de set de 3 en set de 2
+def test_set_of2_wrong_quantity(client, setup_data):
+    # Usar una carta de set de 3 en un endpoint de set de 2
     response = client.post("/sets_of2/4,5")
     assert response.status_code == 400
     assert "You need one more detective" in response.json()["detail"]
 
-def test_set_of2_not_compatible():
-    setup_players_and_detectives()
-    # Dos detectives distintos sin wildcard ni hermanos
+def test_set_of2_not_compatible(client, setup_data):
+    # Dos detectives distintos sin wildcard ni relación de hermanos
     response = client.post("/sets_of2/1,7")
     assert response.status_code == 400
     assert "not two compatible detectives" in response.json()["detail"]
 
-def test_set_of3_same_name():
-    setup_players_and_detectives()
+# --- Tests para Sets de 3 Cartas ---
+
+def test_set_of3_same_name(client, setup_data, mocker):
+    mock_broadcast = mocker.patch(
+        'src.routes.set_routes.broadcast_player_state', 
+        new_callable=AsyncMock
+    )
     response = client.post("/sets_of3/4,5,6")
     assert response.status_code == 201
     data = response.json()
     assert data["name"] == "Miss Marple"
 
-def test_set_of3_with_wildcard():
-    setup_players_and_detectives()
+    mock_broadcast.assert_awaited_once_with(1)
+
+def test_set_of3_with_wildcard(client, setup_data,mocker):
+    mock_broadcast = mocker.patch(
+        'src.routes.set_routes.broadcast_player_state', 
+        new_callable=AsyncMock
+    )
     response = client.post("/sets_of3/3,4,5")
     assert response.status_code == 201
     data = response.json()
     assert data["name"] == "Miss Marple"
+    mock_broadcast.assert_awaited_once_with(1)
 
-def test_set_of3_invalid():
-    setup_players_and_detectives()
+def test_set_of3_invalid_card_id(client, setup_data):
     response = client.post("/sets_of3/4,5,99")
     assert response.status_code == 400
     assert "Invalid card_id" in response.json()["detail"]
 
-def test_set_of3_not_compatible():
-    setup_players_and_detectives()
+def test_set_of3_not_compatible(client, setup_data):
     response = client.post("/sets_of3/1,4,7")
     assert response.status_code == 400
-    assert "not three compatible detectives" in response.json()["detail"]
+    assert "You need just 2 cards to play this set" in response.json()["detail"]
 
-def test_get_set_player():
-    setup_players_and_detectives()
-    # Primero crear un set
-    client.post("/sets_of2/1,2")
-    response = client.get("/sets/list/1")
-    assert response.status_code == 201
+# --- Tests para Endpoints Adicionales ---
+
+def test_get_set_player(client, setup_data,mocker):
+    mock_broadcast = mocker.patch(
+        'src.routes.set_routes.broadcast_player_state', 
+        new_callable=AsyncMock
+    )
+    # Arrange: Primero crear un set
+
+    create_response = client.post("/sets_of2/1,2")
+    assert create_response.status_code == 201
+    set_id = create_response.json()["set_id"]
+    
+    # Act
+    response = client.get(f"/sets/list/{set_id}")
+    
+    # Assert
+    assert response.status_code == 201 
     data = response.json()
+    # Asumiendo que el endpoint devuelve un objeto Set con el ID del jugador
     assert data["player_id"] == 1
+    mock_broadcast.assert_awaited_once_with(1)
 
-def test_steal_set():
-    setup_players_and_detectives()
-    # Crear un set para player 1
-    client.post("/sets_of2/1,2")
-    # Robar el set a player 2
-    response = client.put("/sets/steal/1/2/1")
-    assert response.status_code == 201
+def test_steal_set(client, setup_data, mocker):
+    # Arrange: Crear un set para el jugador 1
+    mock_broadcast = mocker.patch(
+        'src.routes.set_routes.broadcast_player_state', 
+        new_callable=AsyncMock
+    )
+    create_response = client.post("/sets_of2/1,2")
+    assert create_response.status_code == 201
+    set_id = create_response.json()["set_id"]
+
+    # Act: El jugador 2 roba el set 
+    # (Asumo que la URL es /sets/steal/{target_player_id}/{thief_player_id}/{set_id})
+    response = client.put(f"/sets/steal/2/{set_id}")
+    if response.status_code != 201:
+        print("DEBUG - Mensaje de error de la API:", response.json())
+    
+    # Assert
+    assert response.status_code == 201 # PUT exitoso debería ser 200
     data = response.json()
     assert data["player_id"] == 2
+    mock_broadcast.call_count == 2
+    

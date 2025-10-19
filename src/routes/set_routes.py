@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func  
-from src.schemas.set_schemas import Set_Response
+from src.schemas.set_schemas import Set_Response, Set_Base
 from src.database.database import SessionLocal, get_db
 from src.database.models import Card , Game , Detective , Event , Set, Player
 from src.database.services.services_cards import only_6
@@ -11,7 +11,7 @@ import random
 
 set = APIRouter()
 
-@set.post("/sets_of2/{card_id},{card_id_2}", status_code=201, tags = ["Sets"])
+@set.post("/sets_of2/{card_id},{card_id_2}", status_code=201,response_model= Set_Base, tags = ["Sets"])
 async def play_set_of2(card_id : int , card_id_2:int , db:Session=Depends(get_db)):
     card_1 = db.query(Detective).filter(Detective.card_id == card_id).first()
     card_2 = db.query(Detective).filter(Detective.card_id == card_id_2).first()
@@ -74,10 +74,11 @@ async def play_set_of2(card_id : int , card_id_2:int , db:Session=Depends(get_db
     db.commit()
     db.refresh(card_1)
     db.refresh(card_2)
+    db.refresh(game)
     await broadcast_player_state(game_id)
     return new_set
 
-@set.post("/sets_of3/{card_id},{card_id_2},{card_id_3}", status_code=201, tags = ["Sets"])
+@set.post("/sets_of3/{card_id},{card_id_2},{card_id_3}", status_code=201,response_model= Set_Base, tags = ["Sets"])
 async def play_set_of3(card_id : int , card_id_2: int , card_id_3: int , db:Session=Depends(get_db)):
     card_1 = db.query(Detective).filter(Detective.card_id == card_id).first()
     card_2 = db.query(Detective).filter(Detective.card_id == card_id_2).first()
@@ -86,7 +87,7 @@ async def play_set_of3(card_id : int , card_id_2: int , card_id_3: int , db:Sess
     if not card_1 or not card_2 or not card_3:
         raise HTTPException(status_code=400, detail=f"Invalid card_id")
     
-    if (card_1.quantity_set == 2 or card_2.quantity_set == 2 or card_3.quantity_set == 2):
+    if ((card_1.quantity_set == 2 and card_1.name != "Harley Quin Wildcard") or (card_2.quantity_set == 2 and card_2.name != "Harley Quin Wildcard" )or (card_3.quantity_set == 2 and card_3.name != "Harley Quin Wildcard")):
         raise HTTPException(status_code=400, detail=f"You need just 2 cards to play this set")
     
     if (card_1.name == "Harley Quin Wildcard" and card_2.name == card_3.name):
