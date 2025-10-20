@@ -1,134 +1,168 @@
-import os
+"""
+Exhaustive tests for the Player endpoints, using pytest fixtures for isolation.
+"""
 import datetime
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from src.database.models import Base, Game, Player
-from src.database.database import get_db
-from fastapi.testclient import TestClient
-from src.main import app
+import pytest
+from unittest.mock import patch, AsyncMock
 
-# Configuración de la base de datos de prueba para jugadores
-SQLALCHEMY_TEST_DATABASE_URL = "sqlite:///./test_players.db"
-if os.path.exists("./test_players.db"):
-    os.remove("./test_players.db")
-test_engine = create_engine(SQLALCHEMY_TEST_DATABASE_URL, connect_args={"check_same_thread": False})
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
-Base.metadata.create_all(bind=test_engine)
+from src.database.models import Game, Player
 
-def override_get_db():
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# --- Tests for Player Creation (POST /players) ---
 
-app.dependency_overrides[get_db] = override_get_db
-client = TestClient(app)
+def test_create_player_success(client, db_session):
+    """
+    Verifies that a player can be successfully created and added to an available game.
+    """
+    # Arrange: Create a game that is waiting for players
+    game = Game(name="Waiting Game", status="waiting players", max_players=4, min_players=2, players_amount=0)
+    db_session.add(game)
+    db_session.commit()
+    db_session.refresh(game)
+    game_id = game.game_id
 
-# Poblar la base de datos con datos de ejemplo para diferentes escenarios
-with TestingSessionLocal() as db:
-    # Escenario 1: Partida normal con un jugador
-    game1 = Game(game_id=1, name="Test Game", status="waiting players", max_players=4, min_players=2, players_amount=1)
-    player1 = Player(player_id=1, name="Test Player", host=True, birth_date=datetime.date(2000, 1, 1), game_id=1)
-    db.add(game1)
-    db.add(player1)
+    player_data = {"name": "New Player", "host": True, "game_id": game_id, "birth_date": "2000-01-01"}
 
-    # Escenario 2: Partida llena
-    game2 = Game(game_id=2, name="Full Game", status="Full", max_players=2, min_players=2, players_amount=2)
-    player2 = Player(player_id=2, name="Player A", host=True, birth_date=datetime.date(2000, 1, 1), game_id=2)
-    player3 = Player(player_id=3, name="Player B", host=False, birth_date=datetime.date(2001, 1, 1), game_id=2)
-    db.add(game2)
-    db.add(player2)
-    db.add(player3)
+    # Act
+    response = client.post("/players", json=player_data)
 
-    # Escenario 3: Partida válida pero sin jugadores
-    game3 = Game(game_id=3, name="Empty Game", status="waiting players", max_players=4, min_players=2, players_amount=0)
-    db.add(game3)
-    
-    game4 = Game(game_id = 4, name = "Delete Game", status = "waiting players", max_players = 4, min_players = 2, players_amount = 0)
-    db.add(game4)
-    db.commit()
-
-def test_create_player_success():
-    response = client.post(
-        "/players",
-        json={"name": "New Player", "host": False, "game_id": 1, "birth_date": "2001-05-10"}
-    )
+    # Assert
     assert response.status_code == 201
-    player_id = response.json()
-    assert isinstance(player_id, int)
+    data = response.json()
+    assert data["name"] == "New Player"
+    assert data["host"] is True
+    assert data["game_id"] == game_id
+    assert "player_id" in data
 
-def test_create_player_game_not_found():
-    response = client.post(
-        "/players",
-        json={"name": "Another Player", "host": False, "game_id": 999, "birth_date": "2002-06-11"}
-    )
+    # Verify the player was actually added to the database
+    player_in_db = db_session.query(Player).filter(Player.player_id == data["player_id"]).one()
+    assert player_in_db.name == "New Player"
+
+    # Verify the game's player count was updated by the service
+    game_in_db = db_session.query(Game).filter(Game.game_id == game_id).one()
+    
+    assert game_in_db.players_amount == 1
+
+def test_create_player_game_not_found(client):
+    """
+    Verifies that creating a player for a non-existent game returns a 404 error.
+    """
+    player_data = {"name": "Lost Player", "host": False, "game_id": 999, "birth_date": "2000-01-01"}
+    
+    response = client.post("/players", json=player_data)
+    
     assert response.status_code == 404
     assert response.json()["detail"] == "Game not found"
 
-def test_create_player_game_full():
-    game_response = client.post("/games",
-                    json ={"name" : "GameTestsss", "status" : "full", "max_players" : 2, "min_players" : 2} )
-    game_id = game_response.json()["game_id"]
-    mock_player = client.post(
-        "/players",
-        json={"name": "Mock Player 1", "host": False, "game_id": game_id, "birth_date": "2004-08-13"}
-    )
-    mock_player2 = client.post(
-        "/players",
-        json={"name": "Mock Player 2", "host": False, "game_id": game_id, "birth_date": "2004-08-13"}
-    )
+def test_create_player_game_full(client, db_session):
+    """
+    Verifies that trying to join a full game returns a 400 error.
+    """
+    # Arrange: Create a game that is already full
+    game = Game(name="Full Game", status="Full", max_players=2, min_players=2, players_amount=2)
+    db_session.add(game)
+    db_session.commit()
 
-    response = client.post(
-        "/players",
-        json={"name": "Extra Player", "host": False, "game_id": game_id, "birth_date": "2004-08-13"}
-    )
+    player_data = {"name": "Late Player", "host": False, "game_id": game.game_id, "birth_date": "2000-01-01"}
+
+    # Act
+    response = client.post("/players", json=player_data)
+
+    # Assert
     assert response.status_code == 400
     assert response.json()["detail"] == "Game already full"
 
-def test_create_player_success():
-    game_response = client.post("/games",
-                    json ={"name" : "GameTestsss", "status" : "waiting players", "max_players" : 6, "min_players" : 2} )
-    game_id = game_response.json()["game_id"]
+def test_create_player_invalid_data(client, db_session):
+    """
+    Verifies that creating a player with invalid data (e.g., missing fields) returns a 422 error.
+    """
+    game = Game(name="Test Game", status="waiting players", max_players=4, min_players=2, players_amount=0)
+    db_session.add(game)
+    db_session.commit()
+
+    # Missing 'name' and 'birth_date'
+    invalid_player_data = {"host": True, "game_id": game.game_id}
     
-    response = client.post(
-        "/players",
-        json={"name": "New Player", "host": False, "game_id": game_id, "birth_date": "2001-05-10"}
-    )
-    assert response.status_code == 201
+    response = client.post("/players", json=invalid_player_data)
+    
+    assert response.status_code == 422
+
+
+# --- Tests for Listing Players (GET /lobby/players/{game_id}) ---
+
+def test_list_players_success(client, db_session):
+    """
+    Verifies that all players for a given game are listed correctly.
+    """
+    # Arrange: Create a game and add multiple players to it
+    game = Game(name="Popular Game", status="waiting players", max_players=4, min_players=2, players_amount=2)
+    player1 = Player(name="Player One", game=game, host=True, birth_date=datetime.date(2000, 1, 1))
+    player2 = Player(name="Player Two", game=game, host=False, birth_date=datetime.date(2001, 1, 1))
+    db_session.add_all([game, player1, player2])
+    db_session.commit()
+
+    # Act
+    response = client.get(f"/lobby/players/{game.game_id}")
+
+    # Assert
+    assert response.status_code == 200
     data = response.json()
-    # Verificamos que la respuesta sea un diccionario y que contenga el ID del jugador
-    assert isinstance(data, dict)
-    assert "player_id" in data
+    assert len(data) == 2
+    player_names = {p['name'] for p in data}
+    assert "Player One" in player_names
+    assert "Player Two" in player_names
 
-def test_list_players_for_empty_game():
-    response = client.get("/lobby/players/3")
-    assert response.status_code == 404
-    assert response.json()["detail"] == "game not found or no players in this game"
-
-def test_list_players_game_not_found():
+def test_list_players_game_not_found(client):
+    """
+    Verifies that listing players for a non-existent game returns a 404 error.
+    """
     response = client.get("/lobby/players/999")
     assert response.status_code == 404
     assert response.json()["detail"] == "game not found or no players in this game"
 
-def test_delete_player_success():
-    game_response = client.post("/games",
-                    json ={"name" : "GameTestsss", "status" : "waiting players", "max_players" : 6, "min_players" : 2} )
-    game_id = game_response.json()["game_id"]
-    
-    create_response = client.post(
-        "/players",
-        json={"name": "PlayerToDelete", "host": False, "game_id": game_id, "birth_date": "2003-07-12"}
-    )
-    if create_response.status_code != 201:
-        print("DEBUG - Mensaje de error de la API:", create_response.json())
-    
-    player_id = create_response.json()["player_id"]
+def test_list_players_game_with_no_players(client, db_session):
+    """
+    Verifies that listing players for an existing but empty game returns a 404 error.
+    """
+    # Arrange: Create a game with no players
+    game = Game(name="Empty Game", status="waiting players", max_players=4, min_players=2, players_amount=0)
+    db_session.add(game)
+    db_session.commit()
 
+    # Act
+    response = client.get(f"/lobby/players/{game.game_id}")
+
+    # Assert
+    assert response.status_code == 404
+    assert response.json()["detail"] == "game not found or no players in this game"
+
+
+# --- Tests for Deleting a Player (DELETE /players/{player_id}) ---
+
+def test_delete_player_success(client, db_session):
+    """
+    Verifies that a player can be successfully deleted.
+    """
+    # Arrange: Create a game and a player to delete
+    game = Game(name="Test Game", status="waiting players", max_players=4, min_players=2, players_amount=2)
+    player_to_delete = Player(name="Leaver", game=game, host=False, birth_date=datetime.date(2000, 1, 1))
+    db_session.add_all([game, player_to_delete])
+    db_session.commit()
+    player_id = player_to_delete.player_id
+
+    # Act
     delete_response = client.delete(f"/players/{player_id}")
+
+    # Assert
     assert delete_response.status_code == 204
 
-def test_delete_player_not_found():
+    # Verify the player is gone from the database
+    player_in_db = db_session.query(Player).filter(Player.player_id == player_id).first()
+    assert player_in_db is None
+
+def test_delete_player_not_found(client):
+    """
+    Verifies that trying to delete a non-existent player returns a 404 error.
+    """
     response = client.delete("/players/999")
     assert response.status_code == 404
     assert response.json()["detail"] == "Player not found"

@@ -49,6 +49,8 @@ async def pickup_a_card(player_id: int, game_id: int, db: Session = Depends(get_
     random.shuffle(deck)
     if not deck: 
        await finish_game(game_id, db)
+       raise HTTPException(status_code=400, detail="The player already has 6 cards")
+
     if game.cards_left is None:
        await finish_game(game_id, db)
     card = deck[0]
