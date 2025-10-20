@@ -205,9 +205,6 @@ def test_discard_card_success(mock_broadcast, client, db_session):
     assert data["picked_up"] is False # Asumiendo que ⁠ picked_up ⁠ se pone en False
     mock_broadcast.assert_awaited_once_with(player_id)
 
-## ===============================================================
-# ============= NUEVOS TESTS ADICIONALES (VERSIÓN FINAL) ==========
-# ===============================================================
 
 # --- Tests para Endpoints de Listado Específico ---
 
@@ -250,7 +247,6 @@ def test_select_and_discard_specific_card_success(client, db_session):
     """
     Verifica que un jugador puede seleccionar y descartar una carta específica de su mano.
     """
-    # Arrange
     game = Game(name="Test Game", status="in course", max_players=4, min_players=2, players_amount=1)
     player = Player(name="P1", game=game, birth_date=datetime.date(2000, 1, 1))
     db_session.add_all([game, player])
@@ -261,17 +257,13 @@ def test_select_and_discard_specific_card_success(client, db_session):
     db_session.add_all([card_to_keep, card_to_discard])
     db_session.commit()
 
-    # Act
     response = client.put(f"/cards/game/drop/{player.player_id},{card_to_discard.card_id}")
 
-    # Assert
     assert response.status_code == 200
     response_data = response.json()
-    # CORRECCIÓN 4: Comprobar por 'card_id' en lugar de 'name' que no está en Card_Response.
     assert response_data["card_id"] == card_to_discard.card_id
     assert response_data["dropped"] is True
 
-    # CORRECCIÓN 4: Re-obtener el objeto de la DB en lugar de refrescarlo.
     updated_discarded_card = db_session.get(Event, card_to_discard.card_id)
     assert updated_discarded_card.dropped is True
     assert updated_discarded_card.discardInt == 1
@@ -298,7 +290,6 @@ def test_get_draft_pile_success(client, db_session):
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 2
-    # CORRECCIÓN 4: Comprobar por 'card_id' en lugar de 'name'.
     draft_card_ids = {card["card_id"] for card in data}
     assert draft_card1.card_id in draft_card_ids
     assert draft_card2.card_id in draft_card_ids
@@ -326,7 +317,6 @@ async def test_pickup_draft_card_success(mock_broadcast_draft, mock_broadcast_ga
     # Assert
     assert response.status_code == 200
     
-    # CORRECCIÓN 4: Re-obtener el objeto de la DB en lugar de refrescarlo.
     updated_card = db_session.get(Event, card_id)
     assert updated_card.player_id == player_id
     assert updated_card.draft is False
@@ -361,7 +351,6 @@ def test_get_top_discard_pile_ordered_correctly(client, db_session):
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 5
-    # CORRECCIÓN 4: Comprobar por 'discardInt' que sí está en la respuesta.
     assert data[0]["discardInt"] == 7
     assert data[4]["discardInt"] == 3
 
@@ -394,10 +383,8 @@ async def test_discard_list_of_cards_success(mock_broadcast, client, db_session)
         json={"card_ids": card_ids_to_discard}
     )
 
-    # Assert
     assert response.status_code == 200
     
-    # CORRECCIÓN 4: Re-obtener los objetos de la DB en lugar de refrescarlos.
     updated_card1 = db_session.get(Event, card_ids_to_discard[0])
     updated_card2 = db_session.get(Event, card_ids_to_discard[1])
     updated_card_to_keep = db_session.get(Event, id_card_to_keep)
