@@ -49,21 +49,25 @@ async def pickup_a_card(player_id: int, game_id: int, db: Session = Depends(get_
     random.shuffle(deck)
     if not deck: 
        await finish_game(game_id, db)
+       raise HTTPException(status_code=400, detail="The player already has 6 cards")
+
     if game.cards_left is None:
        await finish_game(game_id, db)
-    card = deck[0]
-    try:
-        card.picked_up = True
-        card.player_id = player_id
-        game.cards_left = len(deck) -1
-        db.commit()
-        db.refresh(card)
-        db.refresh(game)
-        await broadcast_game_information(game_id)
-        return card
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=400, detail=f"Error assigning card to player: {str(e)}")
+       raise HTTPException(status_code=400, detail="The player already has 6 cards")
+    else:
+        card = deck[0]
+        try:
+            card.picked_up = True
+            card.player_id = player_id
+            game.cards_left = len(deck) -1
+            db.commit()
+            db.refresh(card)
+            db.refresh(game)
+            await broadcast_game_information(game_id)
+            return card
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=400, detail=f"Error assigning card to player: {str(e)}")
 
 
 @card.put("/cards/drop/{player_id}" , status_code=200, tags = ["Cards"], response_model=Card_Response)

@@ -4,9 +4,18 @@ Exhaustive tests for the Game endpoints and services, using pytest fixtures for 
 import datetime
 import pytest
 from unittest.mock import patch, AsyncMock
-
-from src.database.models import Game, Player
+import datetime
+from src.database.models import Game, Player , Event , Card , Detective
 from src.database.services.services_games import assign_turn_to_players, update_players_on_game, finish_game
+from src.database.services.services_cards import (
+    init_detective_cards,
+    init_event_cards,
+    deal_NSF,
+    deal_cards_to_players,
+    setup_initial_draft_pile,
+    replenish_draft_pile,
+    only_6
+)
 
 # --- Tests for Game Creation (POST /games) ---
 
@@ -308,3 +317,122 @@ async def test_finish_game_already_finished(db_session):
     result = await finish_game(game.game_id, db_session)
     
     assert result == {"message": f"Game {game.game_id} is already finished."}
+
+"""
+Tests para el módulo de servicios de cartas (services_cards.py).
+Estos tests se enfocan en la lógica de negocio, no en los endpoints,
+para asegurar que las funciones internas se comporten como se espera.
+"""
+
+
+
+def test_full_game_initialization_flow(db_session):
+    # ...
+    game = Game(name="Partida Completa", max_players=4, min_players=4, players_amount=4)
+    players = [
+        # CORRECCIÓN 5: Usar datetime.date() en lugar de strings
+        Player(name="Jugador 1", game=game, birth_date=datetime.date(2000, 1, 1)),
+        Player(name="Jugador 2", game=game, birth_date=datetime.date(2000, 1, 2)),
+        Player(name="Jugador 3", game=game, birth_date=datetime.date(2000, 1, 3)),
+        Player(name="Jugador 4", game=game, birth_date=datetime.date(2000, 1, 4)),
+    ]
+    db_session.add(game)
+    db_session.add_all(players)
+    db_session.commit()
+    # --- 2. Act: Inicializar los mazos de cartas ---
+    init_detective_cards(game.game_id, db_session)
+    init_event_cards(game.game_id, db_session)
+
+    # --- Assert 2: Verificar que todos los mazos se crearon ---
+    total_detectives = db_session.query(Detective).filter(Detective.game_id == game.game_id).count()
+    total_events = db_session.query(Event).filter(Event.game_id == game.game_id).count()
+    # Suma de cantidades: 25 detectives + 36 eventos = 61 cartas totales
+    assert total_detectives == 25
+    assert total_events == 36
+    assert db_session.query(Card).filter(Card.game_id == game.game_id).count() == 61
+
+    # --- 3. Act: Repartir las cartas "Not so fast" (NSF) y las de la mano inicial ---
+    deal_NSF(game.game_id, db_session)
+    deal_cards_to_players(game.game_id, db_session)
+
+    # --- Assert 3: Verificar que los jugadores tienen las cartas correctas ---
+    player1 = db_session.query(Player).filter(Player.name == "Jugador 1").one()
+    
+    # Cada jugador debe tener 6 cartas: 1 NSF + 5 del mazo
+    assert len(player1.cards) == 6
+    
+    # Contar cuántas de esas cartas son "Not so fast"
+    nsf_count = sum(1 for card in player1.cards if hasattr(card, 'name') and card.name == "Not so fast")
+    assert nsf_count >= 1
+    
+    # Verificar que el total de cartas repartidas es correcto (4 jugadores * 6 cartas)
+    assigned_cards = db_session.query(Card).filter(Card.game_id == game.game_id, Card.player_id.isnot(None)).count()
+    assert assigned_cards == 24
+
+    # --- 4. Act: Preparar la pila de draft inicial ---
+    setup_initial_draft_pile(game.game_id, db_session)
+    db_session.commit() # La función no hace commit, lo hacemos aquí para guardar el estado.
+
+    # --- Assert 4: Verificar que la pila de draft se creó correctamente ---
+    draft_cards = db_session.query(Card).filter(Card.game_id == game.game_id, Card.draft == True).all()
+    assert len(draft_cards) == 3
+    # Asegurarse de que las cartas del draft no están asignadas a ningún jugador
+    for card in draft_cards:
+        assert card.player_id is None
+
+
+def test_replenish_draft_pile(db_session):
+    """
+    Prueba específicamente la función 'replenish_draft_pile'.
+    """
+    # Arrange: Crear una partida con un mazo y una pila de draft incompleta
+    game = Game(name="Partida en curso", max_players=4, min_players=2, players_amount=1, cards_left=10)
+    db_session.add(game)
+    db_session.commit()
+    
+    # Crear 10 cartas en el mazo principal
+    for i in range(10):
+        db_session.add(Event(name=f"Carta Mazo {i}", game_id=game.game_id, draft=False, picked_up=False, dropped=False))
+    
+    # Crear 2 cartas ya en el draft (simulando que un jugador acaba de tomar una)
+    db_session.add(Event(name="Carta Draft 1", game_id=game.game_id, draft=True, picked_up=False, dropped=False))
+    db_session.add(Event(name="Carta Draft 2", game_id=game.game_id, draft=True, picked_up=False, dropped=False))
+    db_session.commit()
+
+    # Act: Llamar al servicio para reponer la pila
+    replenish_draft_pile(game.game_id, db_session)
+    db_session.commit() # Guardar los cambios hechos por la función
+
+    # Assert
+    draft_count = db_session.query(Card).filter(Card.game_id == game.game_id, Card.draft == True).count()
+    assert draft_count == 3 # Ahora debería haber 3 cartas de nuevo
+
+    # Verificar que el contador de cartas del juego se actualizó
+    db_session.refresh(game)
+    assert game.cards_left == 9
+
+
+# Tests unitarios para la función only_6 (si aún no los tienes)
+def test_only_6_returns_true_when_hand_is_full(db_session):
+    game = Game(name="Test Game", max_players=4, min_players=2, players_amount=1)
+    # CORRECCIÓN 5: Usar datetime.date() en lugar de strings
+    player = Player(name="P1", game=game, birth_date=datetime.date(2000, 1, 1))
+    db_session.add_all([game, player])
+    db_session.commit()
+    for i in range(6):
+        db_session.add(Event(name=f"Card {i}", player_id=player.player_id, game_id=game.game_id, picked_up=True, dropped=False))
+    db_session.commit()
+
+    assert only_6(player.player_id, db_session) is True
+
+def test_only_6_returns_false_when_hand_is_not_full(db_session):
+    game = Game(name="Test Game", max_players=4, min_players=2, players_amount=1)
+    # CORRECCIÓN 5: Usar datetime.date() en lugar de strings
+    player = Player(name="P1", game=game, birth_date=datetime.date(2000, 1, 1))
+    db_session.add_all([game, player])
+    db_session.commit()
+    for i in range(5):
+        db_session.add(Event(name=f"Card {i}", player_id=player.player_id, game_id=game.game_id, picked_up=True, dropped=False))
+    db_session.commit()
+    
+    assert only_6(player.player_id, db_session) is False
