@@ -24,7 +24,8 @@ def create_player(player : Player_Base, db: Session = Depends(get_db)):
     new_player = Player (name = player.name,
                             host = player.host,
                             game_id = player.game_id,
-                            birth_date = player.birth_date)
+                            birth_date = player.birth_date,
+                            avatar = player.avatar)
     game = db.get(Game, new_player.game_id)
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")

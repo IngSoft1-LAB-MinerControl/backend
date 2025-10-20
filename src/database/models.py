@@ -28,6 +28,7 @@ class Player(Base):
     host = Column(Boolean, default=False)
     birth_date = Column(Date, nullable = False)
     turn_order = Column(Integer) # Posición del jugador en el turno
+    avatar = Column(String(255), nullable = True)
     game_id = Column(Integer, ForeignKey("games.game_id"), nullable=False)  
     game = relationship("Game", back_populates="players")
     cards = relationship("Card",primaryjoin="and_(Card.player_id == Player.player_id, Card.dropped == False)", back_populates="player")

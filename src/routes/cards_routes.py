@@ -56,6 +56,8 @@ async def pickup_a_card(player_id: int, game_id: int, db: Session = Depends(get_
         card.picked_up = True
         card.player_id = player_id
         game.cards_left = len(deck) -1
+        if game.cards_left == 0:
+            await finish_game(game_id, db)
         db.commit()
         db.refresh(card)
         db.refresh(game)

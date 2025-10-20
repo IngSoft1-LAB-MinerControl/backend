@@ -11,6 +11,7 @@ class Player_Base(BaseModel):
     host : bool 
     game_id : int 
     birth_date : datetime.date
+    avatar : Optional[str] = None
     model_config = ConfigDict(from_attributes=True)    
 
 
