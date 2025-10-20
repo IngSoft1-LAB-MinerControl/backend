@@ -45,6 +45,8 @@ with TestingSessionLocal() as db:
     game3 = Game(game_id=3, name="Empty Game", status="waiting players", max_players=4, min_players=2, players_amount=0)
     db.add(game3)
     
+    game4 = Game(game_id = 4, name = "Delete Game", status = "waiting players", max_players = 4, min_players = 2, players_amount = 0)
+    db.add(game4)
     db.commit()
 
 def test_create_player_success():
@@ -65,17 +67,33 @@ def test_create_player_game_not_found():
     assert response.json()["detail"] == "Game not found"
 
 def test_create_player_game_full():
+    game_response = client.post("/games",
+                    json ={"name" : "GameTestsss", "status" : "full", "max_players" : 2, "min_players" : 2} )
+    game_id = game_response.json()["game_id"]
+    mock_player = client.post(
+        "/players",
+        json={"name": "Mock Player 1", "host": False, "game_id": game_id, "birth_date": "2004-08-13"}
+    )
+    mock_player2 = client.post(
+        "/players",
+        json={"name": "Mock Player 2", "host": False, "game_id": game_id, "birth_date": "2004-08-13"}
+    )
+
     response = client.post(
         "/players",
-        json={"name": "Extra Player", "host": False, "game_id": 2, "birth_date": "2004-08-13"}
+        json={"name": "Extra Player", "host": False, "game_id": game_id, "birth_date": "2004-08-13"}
     )
     assert response.status_code == 400
     assert response.json()["detail"] == "Game already full"
 
 def test_create_player_success():
+    game_response = client.post("/games",
+                    json ={"name" : "GameTestsss", "status" : "waiting players", "max_players" : 6, "min_players" : 2} )
+    game_id = game_response.json()["game_id"]
+    
     response = client.post(
         "/players",
-        json={"name": "New Player", "host": False, "game_id": 1, "birth_date": "2001-05-10"}
+        json={"name": "New Player", "host": False, "game_id": game_id, "birth_date": "2001-05-10"}
     )
     assert response.status_code == 201
     data = response.json()
@@ -94,12 +112,19 @@ def test_list_players_game_not_found():
     assert response.json()["detail"] == "game not found or no players in this game"
 
 def test_delete_player_success():
+    game_response = client.post("/games",
+                    json ={"name" : "GameTestsss", "status" : "waiting players", "max_players" : 6, "min_players" : 2} )
+    game_id = game_response.json()["game_id"]
+    
     create_response = client.post(
         "/players",
-        json={"name": "PlayerToDelete", "host": False, "game_id": 1, "birth_date": "2003-07-12"}
+        json={"name": "PlayerToDelete", "host": False, "game_id": game_id, "birth_date": "2003-07-12"}
     )
-    player_id = create_response.json()["player_id"]
+    if create_response.status_code != 201:
+        print("DEBUG - Mensaje de error de la API:", create_response.json())
     
+    player_id = create_response.json()["player_id"]
+
     delete_response = client.delete(f"/players/{player_id}")
     assert delete_response.status_code == 204
 
