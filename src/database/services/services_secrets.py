@@ -97,7 +97,7 @@ def update_social_disgrace(player: Player):
         return
 
     accomplice_revealed = any(s.revelated and s.acomplice for s in player.secrets)
-    all_secrets_revealed = all(s.revelated for s in player.secrets)
+    all_secrets_revealed = all(s.revelated for s in player.secrets) if player.secrets else False
     
     player.social_disgrace = accomplice_revealed or all_secrets_revealed
 
