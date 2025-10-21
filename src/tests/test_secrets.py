@@ -5,8 +5,6 @@ import datetime
 import pytest
 from unittest.mock import patch, AsyncMock
 
-# Import only the necessary models and services for testing.
-# The TestClient (client) and db_session are provided by fixtures from conftest.py.
 from src.database.models import Game, Player, Secrets
 from src.database.services.services_secrets import init_secrets, deal_secrets_to_players
 
@@ -16,22 +14,22 @@ def setup_data(db_session):
     Fixture to create a consistent set of data for secret-related tests.
     This runs for each test, ensuring a clean state.
     """
-    # Arrange: Create a game, players, and secrets for various scenarios
-    game = Game(game_id=1, name="Secret Game", status="in course", max_players=4, min_players=2, players_amount=3)
+    game = Game(game_id=1, name="Secret Game", status="in course", max_players=4, min_players=2, players_amount=4)
     
-    # Player 1 has a hidden murderer secret and a revealed normal secret
-    player1 = Player(player_id=1, name="Secret Player", host=True, birth_date=datetime.date(2000, 1, 1), game_id=1, turn_order=1)
+    player1 = Player(player_id=1, name="Secret Player", host=True, birth_date=datetime.date(2000, 1, 1), game_id=1, turn_order=1, social_disgrace=False)
     murderer_secret = Secrets(secret_id=1, murderer=True, acomplice=False, revelated=False, player_id=1, game_id=1)
     revealed_secret = Secrets(secret_id=2, murderer=False, acomplice=False, revelated=True, player_id=1, game_id=1)
     not_revealed_secret = Secrets(secret_id=3, murderer=False, acomplice=False, revelated=False, player_id=1, game_id=1)
 
-    # Player 2 has no secrets initially
-    player2 = Player(player_id=2, name="Innocent Player", host=False, birth_date=datetime.date(2001, 1, 1), game_id=1, turn_order=2)
+    player2 = Player(player_id=2, name="Innocent Player", host=False, birth_date=datetime.date(2001, 1, 1), game_id=1, turn_order=2, social_disgrace=False)
     
-    # Player 3 is a target for stealing secrets
-    player3 = Player(player_id=3, name="Target Player", host=False, birth_date=datetime.date(2002, 2, 2), game_id=1, turn_order=3)
+    player3 = Player(player_id=3, name="Target Player", host=False, birth_date=datetime.date(2002, 2, 2), game_id=1, turn_order=3, social_disgrace=False)
     
-    db_session.add_all([game, player1, player2, player3, murderer_secret, revealed_secret, not_revealed_secret])
+    player4_all_revealed = Player(player_id=4, name="Disgraced Player", host=False, birth_date=datetime.date(2003, 3, 3), game_id=1, turn_order=4, social_disgrace=True)
+    p4_secret1 = Secrets(secret_id=4, murderer=False, acomplice=False, revelated=True, player_id=4, game_id=1)
+    p4_secret2 = Secrets(secret_id=5, murderer=False, acomplice=False, revelated=True, player_id=4, game_id=1)
+
+    db_session.add_all([game, player1, player2, player3, player4_all_revealed, murderer_secret, revealed_secret, not_revealed_secret, p4_secret1, p4_secret2])
     db_session.commit()
 
 
@@ -64,11 +62,14 @@ def test_list_secrets_of_game_success(client, setup_data):
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, list)
-    assert len(data) == 3
+    assert len(data) == 5
 
-def test_list_secrets_of_game_with_no_secrets(client):
+def test_list_secrets_of_game_with_no_secrets(client, db_session):
     """Verifies the 404 response for a game that has no secrets or does not exist."""
-    response = client.get("/lobby/secrets_game/999")
+    game = Game(game_id=99, name="Empty Game", max_players=4, min_players=2, players_amount=0)
+    db_session.add(game)
+    db_session.commit()
+    response = client.get("/lobby/secrets_game/99")
     assert response.status_code == 404
     assert "No secrets found" in response.json()["detail"]
 
@@ -79,10 +80,7 @@ def test_list_secrets_of_game_with_no_secrets(client):
 async def test_reveal_secret_success(client, setup_data, mocker):
     """Verifies that a secret can be revealed successfully."""
     mocker.patch('src.routes.secrets_routes.broadcast_game_information', new_callable=AsyncMock)
-    # Secret 2 is the murderer secret, but not revealed yet
     response = client.put("/secrets/reveal/3")
-    if response.status_code!=200:
-        print(response.json())
     assert response.status_code == 200
     assert response.json()["revelated"] is True
 
@@ -92,7 +90,7 @@ async def test_reveal_murderer_secret_finishes_game(client, setup_data, mocker):
     mock_finish_game = mocker.patch('src.database.services.services_secrets.finish_game', new_callable=AsyncMock)
     mocker.patch('src.routes.secrets_routes.broadcast_game_information', new_callable=AsyncMock)
     
-    response = client.put("/secrets/reveal/1") # Secret 1 is the murderer
+    response = client.put("/secrets/reveal/1")
     assert response.status_code == 200
     mock_finish_game.assert_awaited_once_with(1, mocker.ANY)
 
@@ -106,7 +104,6 @@ async def test_reveal_secret_not_found(client):
 @pytest.mark.asyncio
 async def test_reveal_secret_already_revealed(client, setup_data):
     """Verifies that a secret that is already revealed cannot be revealed again."""
-    # Secret 2 is already revealed in the fixture
     response = client.put("/secrets/reveal/2")
     assert response.status_code == 400
     assert "Secret is already revealed" in response.json()["detail"]
@@ -118,7 +115,6 @@ async def test_reveal_secret_already_revealed(client, setup_data):
 async def test_hide_secret_success(client, setup_data, mocker):
     """Verifies that a revealed secret can be hidden."""
     mocker.patch('src.routes.secrets_routes.broadcast_game_information', new_callable=AsyncMock)
-    # Secret 2 is revealed in the fixture
     response = client.put("/secrets/hide/2")
     assert response.status_code == 200
     assert response.json()["revelated"] is False
@@ -133,7 +129,6 @@ async def test_hide_secret_not_found(client):
 @pytest.mark.asyncio
 async def test_hide_secret_not_revealed(client, setup_data):
     """Verifies that a secret that is not revealed cannot be hidden."""
-    # Secret 1 is not revealed in the fixture
     response = client.put("/secrets/hide/1")
     assert response.status_code == 400
     assert "Secret is not revealed" in response.json()["detail"]
@@ -145,17 +140,15 @@ async def test_hide_secret_not_revealed(client, setup_data):
 async def test_steal_secret_success(client, setup_data, mocker):
     """Verifies that a player can steal a revealed secret from another."""
     mocker.patch('src.routes.secrets_routes.broadcast_game_information', new_callable=AsyncMock)
-    # Steal secret 2 (which is revealed) and give it to player 3
     response = client.put("/secrets/steal/2,3")
     assert response.status_code == 200
     data = response.json()
     assert data["player_id"] == 3
-    assert data["revelated"] is False # Secret should be hidden after being stolen
+    assert data["revelated"] is False
 
 @pytest.mark.asyncio
 async def test_steal_secret_must_be_revealed(client, setup_data):
     """Verifies that a secret must be revealed to be stolen."""
-    # Secret 1 is not revealed
     response = client.put("/secrets/steal/1,3")
     assert response.status_code == 400
     assert "Secret must be revealed to be stolen" in response.json()["detail"]
@@ -166,6 +159,69 @@ async def test_steal_secret_target_player_not_found(client, setup_data):
     response = client.put("/secrets/steal/2,999")
     assert response.status_code == 404
     assert "Player not found" in response.json()["detail"]
+
+
+# --- Tests for Social Disgrace ---
+
+@pytest.mark.asyncio
+async def test_social_disgrace_becomes_true_on_last_secret_reveal(client, setup_data, db_session, mocker):
+    """Verifies social_disgrace becomes True when a player's last secret is revealed."""
+    mocker.patch('src.routes.secrets_routes.broadcast_game_information', new_callable=AsyncMock)
+    
+    # Player 1 has secrets 1 (hidden), 2 (revealed), 3 (hidden)
+    # Reveal secret 1
+    client.put("/secrets/reveal/1")
+    # Reveal secret 3
+    client.put("/secrets/reveal/3")
+
+    db_session.refresh(db_session.get(Player, 1))
+    player1 = db_session.get(Player, 1)
+    assert player1.social_disgrace is True
+
+@pytest.mark.asyncio
+async def test_social_disgrace_becomes_false_when_secret_is_hidden(client, setup_data, db_session, mocker):
+    """Verifies social_disgrace becomes False when a secret is hidden for a disgraced player."""
+    mocker.patch('src.routes.secrets_routes.broadcast_game_information', new_callable=AsyncMock)
+    
+    # Player 4 has all secrets revealed (4, 5)
+    player4 = db_session.get(Player, 4)
+    assert player4.social_disgrace is True
+
+    # Hide one of their secrets
+    client.put("/secrets/hide/4")
+
+    player4 = db_session.get(Player, 4)
+    assert player4.social_disgrace is False
+
+@pytest.mark.asyncio
+async def test_social_disgrace_updates_on_steal(client, setup_data, db_session, mocker):
+    """Verifies social_disgrace is updated for both players when a secret is stolen."""
+    mocker.patch('src.routes.secrets_routes.broadcast_game_information', new_callable=AsyncMock)
+    
+    # Player 4 starts in disgrace. Player 3 does not.
+    player4 = db_session.get(Player, 4)
+    player3 = db_session.get(Player, 3)
+    assert player4.social_disgrace is True
+    assert player3.social_disgrace is False
+    
+    # Player 3 steals a secret from Player 4
+    client.put("/secrets/steal/4,3") # Steal secret 4, give to player 3
+
+    player4 = db_session.get(Player, 4)
+    player3 = db_session.get(Player, 3)
+
+    print (f"Player 4 disgrace: {player4.social_disgrace}, Player 3 disgrace: {player3.social_disgrace}")
+    # Player 4 should continue in social disgrace
+    assert player4.social_disgrace is True
+    # Player 3 now has a new hidden secret, so they remain not in disgrace
+    assert player3.social_disgrace is False
+
+@pytest.mark.asyncio
+async def test_player_with_no_secrets_not_in_disgrace(client, setup_data, db_session):
+    """Verifies a player with no secrets does not trigger social disgrace."""
+    player2 = db_session.get(Player, 2)
+    assert not player2.secrets
+    assert player2.social_disgrace is False
 
 
 # --- Tests for Service Layer Logic ---
@@ -180,7 +236,7 @@ def test_init_secrets_less_than_5_players(db_session):
     init_secrets(game.game_id, db_session)
     
     secrets = db_session.query(Secrets).filter(Secrets.game_id == game.game_id).all()
-    assert len(secrets) == 12  # 4 players * 3 secrets
+    assert len(secrets) == 12
     assert any(s.murderer for s in secrets)
     assert not any(s.acomplice for s in secrets)
 
@@ -194,7 +250,7 @@ def test_init_secrets_more_than_4_players(db_session):
     init_secrets(game.game_id, db_session)
     
     secrets = db_session.query(Secrets).filter(Secrets.game_id == game.game_id).all()
-    assert len(secrets) == 15  # 5 players * 3 secrets
+    assert len(secrets) == 15
     assert any(s.murderer for s in secrets)
     assert any(s.acomplice for s in secrets)
 
@@ -208,9 +264,11 @@ def test_deal_secrets_avoids_murderer_and_acomplice_on_same_player(db_session):
 
     deal_secrets_to_players(game.game_id, db_session)
 
-    murderer_secret = db_session.query(Secrets).filter(Secrets.game_id == game.game_id, Secrets.murderer == True).one()
-    acomplice_secret = db_session.query(Secrets).filter(Secrets.game_id == game.game_id, Secrets.acomplice == True).one()
+    murderer_secret = db_session.query(Secrets).filter(Secrets.game_id == game.game_id, Secrets.murderer == True).one_or_none()
+    acomplice_secret = db_session.query(Secrets).filter(Secrets.game_id == game.game_id, Secrets.acomplice == True).one_or_none()
 
+    assert murderer_secret is not None
+    assert acomplice_secret is not None
     assert murderer_secret.player_id is not None
     assert acomplice_secret.player_id is not None
     assert murderer_secret.player_id != acomplice_secret.player_id

@@ -34,6 +34,7 @@ class Player(Base):
     cards = relationship("Card",primaryjoin="and_(Card.player_id == Player.player_id, Card.dropped == False)", back_populates="player")
     secrets = relationship("Secrets", back_populates="player")
     sets = relationship("Set" , back_populates="player")
+    social_disgrace = Column(Boolean, default=False)  # Nueva columna para Social Disgrace
 
 class Card(Base):
     __tablename__ = 'cards'

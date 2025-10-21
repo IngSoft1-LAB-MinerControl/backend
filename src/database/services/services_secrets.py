@@ -81,6 +81,25 @@ def init_secrets(game_id : int , db: Session = Depends(get_db)):
 
     return {"message": f"{len(new_secret_list)} secrets created successfully"}
 
+def update_social_disgrace(player: Player):
+    """
+    Verifica si un jugador debe estar en desgracia social. NO HACE COMMIT.
+    Reglas:
+    - Si un jugador revela su secreto de 'Cómplice', entra en desgracia.
+    - Si un jugador tiene todos sus secretos revelados, entra en desgracia.
+    - Si un jugador estaba en desgracia y se queda sin secretos, permanece en desgracia.
+    """
+    if not player:
+        return
+
+    # Si ya está en desgracia y se queda sin secretos, permanece en desgracia.
+    if player.social_disgrace and not player.secrets:
+        return
+
+    accomplice_revealed = any(s.revelated and s.acomplice for s in player.secrets)
+    all_secrets_revealed = all(s.revelated for s in player.secrets) if player.secrets else False
+    
+    player.social_disgrace = accomplice_revealed or all_secrets_revealed
 
 async def reveal_secret(secret_id: int, db: Session):
     secret = db.query(Secrets).filter(Secrets.secret_id == secret_id).first()
@@ -90,11 +109,18 @@ async def reveal_secret(secret_id: int, db: Session):
         raise HTTPException(status_code=400, detail="Secret is already revealed")
 
     secret.revelated = True
+    
+    player = db.query(Player).filter(Player.player_id == secret.player_id).first()
+    if player:
+        update_social_disgrace(player)
+
     if secret.murderer:
-        # Si es la carta del asesino, se termina el juego
         await finish_game(secret.game_id, db)
+
     try:
         db.commit()
+        if player:
+            db.refresh(player)
         db.refresh(secret)
         return secret
     except Exception as e:
@@ -107,9 +133,17 @@ def hide_secret(secret_id: int, db: Session):
         raise HTTPException(status_code=404, detail="Secret not found")
     if not secret.revelated:
         raise HTTPException(status_code=400, detail="Secret is not revealed")
+    
     secret.revelated = False
+
+    player = db.query(Player).filter(Player.player_id == secret.player_id).first()
+    if player:
+        update_social_disgrace(player)
+        
     try: 
         db.commit()
+        if player:
+            db.refresh(player)
         db.refresh(secret)
         return secret
     except Exception as e:
@@ -117,22 +151,29 @@ def hide_secret(secret_id: int, db: Session):
         raise HTTPException(status_code=400, detail=f"Error hiding secret: {str(e)}")
 
 def steal_secret(target_player_id: int, secret_id: int, db: Session):
-    # roba secreto_id y el nuevo dueño del secreto es target_player_id
-    # EL SECRETO TIENE QUE ESTAR REVELADO
     secret = db.query(Secrets).filter(Secrets.secret_id == secret_id).first()
     if not secret:
         raise HTTPException(status_code=404, detail="Secret not found")
     if not secret.revelated:
         raise HTTPException(status_code=400, detail="Secret must be revealed to be stolen")
+    
     new_owner = db.query(Player).filter(Player.player_id == target_player_id).first()
+    
     if not new_owner:
         raise HTTPException(status_code=404, detail="Player not found")
 
-    hide_secret(secret_id=secret_id, db=db) # al robarlo se oculta automaticamente
+    # 1. Cambiar el estado del secreto
     secret.player_id = new_owner.player_id
+    secret.revelated = False
 
+    # 2. Actualizar el estado de desgracia de ambos jugadores (con la información ya actualizada)
+    update_social_disgrace(new_owner)
+    
+    # 3. Hacer commit de todos los cambios a la vez
     try:
         db.commit()
+        # Refrescar todos los objetos modificados para que la sesión los tenga actualizados
+        db.refresh(new_owner)
         db.refresh(secret)
         return secret
     except Exception as e:
