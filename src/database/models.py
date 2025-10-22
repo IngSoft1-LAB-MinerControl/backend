@@ -47,7 +47,7 @@ class Card(Base):
     game_id = Column(Integer, ForeignKey("games.game_id"), nullable=False)  
     game = relationship("Game", back_populates="cards")
     draft = Column(Boolean, default=False)
-    discardInt = Column(Integer, default=0)
+    discardInt = Column(Integer, default=0) # en caso de ser -1 representara que se jugo delay murderers escape
 
     __mapper_args__ = {
         'polymorphic_on': type,

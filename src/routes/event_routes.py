@@ -7,7 +7,7 @@ from src.database.services.services_cards import only_6 , replenish_draft_pile
 from src.database.services.services_games import finish_game
 from src.schemas.card_schemas import Card_Response
 from src.database.services.services_websockets import broadcast_last_discarted_cards, broadcast_game_information , broadcast_player_state, broadcast_card_draft
-from src.database.services.services_events import cards_off_table, look_into_ashes, one_more, early_train_paddington
+from src.database.services.services_events import cards_off_table, look_into_ashes, one_more, early_train_paddington, delay_the_murderers_escape
 import random
 
 events = APIRouter()
@@ -79,4 +79,17 @@ async def activate_look_into_ashes_event(player_id: int, card_id: int, db: Sessi
     await broadcast_game_information(player.game_id)
     await broadcast_last_discarted_cards(player.game_id)
     return taken_card
+
+@events.put ("/event/delay_escape/{game_id}", status_code=  200,response_model= list[Card_Response] ,tags = ["Events"]) 
+async def activate_delay_murderers_escape (game_id :int, db : Session = Depends(get_db)) : 
+    game = db.query(Game).filter(Game.game_id == game_id).first()
+    if not game : 
+        raise HTTPException(status_code=404, detail="Game not found.")
+    discarded_cards = delay_the_murderers_escape(game_id, db)
+    await broadcast_game_information(game_id)
+    await broadcast_last_discarted_cards(game_id)
+
+    return discarded_cards
+
+    
 

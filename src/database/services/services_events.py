@@ -64,45 +64,42 @@ def one_more(receive_secret_player_id: int, secret_id: int, db: Session):
         raise HTTPException(status_code=400, detail=f"Error executing 'One More' event: {str(e)}")
 
 
-# def delay_the_murderers_escape(game_id: int, player_id: int, cards_to_return_ids: List[int], db: Session):
-#     """
-#     Implementa el efecto de la carta 'Delay the Murderer's Escape!'.
-#     Toma hasta 5 cartas de la pila de descarte y las devuelve al mazo.
-#     La carta de evento se retira del juego.
-#     """
-#     # 2. Obtener las cartas de la pila de descarte a devolver al mazo
-#     if len(cards_to_return_ids) > 5:
-#         raise HTTPException(status_code=400, detail="Cannot return more than 5 cards to the draw pile.")
+def delay_the_murderers_escape(game_id: int, db: Session):
+    """
+    Implementa el efecto de la carta 'Delay the Murderer's Escape!'.
+    Toma hasta 5 cartas de la pila de descarte y las devuelve al mazo.
+    La carta de evento se retira del juego.
+    """
+
+    game = db.query(Game).filter(Game.game_id == game_id).first()
+    if not game : 
+        raise HTTPException(status_code=404, detail="No game found ")
     
-#     cards_to_return = db.query(Card).filter(
-#         Card.card_id.in_(cards_to_return_ids),
-#         Card.game_id == game_id,
-#         Card.dropped == True, # Debe estar en la pila de descarte
-#     ).all()
 
-#     if len(cards_to_return) != len(cards_to_return_ids):
-#         raise HTTPException(status_code=404, detail="One or more selected cards not found in the discard pile or are not available.")
+    # Agarrro maximo las ultimas 5 cartas descartadas 
+    last_discarded_cards = db.query(Card).filter(
+        Card.game_id == game_id,
+        Card.dropped == True
+    ).order_by(desc(Card.discardInt)).limit(5).all()
 
-#     # 3. Restablecer el estado de las cartas seleccionadas y devolverlas al mazo
-#     game = db.query(Game).filter(Game.game_id == game_id).first()
-#     if not game:
-#         raise HTTPException(status_code=404, detail="Game not found.")
+    if not last_discarded_cards:
+        raise HTTPException(status_code=404, detail="No cards found in the discard pile for this game.")
+    for card in last_discarded_cards : 
+        card.dropped = False 
+        card.picked_up = False 
+        card.draft = False
+        card.player_id = None  
+        card.discardInt = -1 
+        game.cards_left += 1 
+    try : 
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error executing 'Delay murderer escapes' event: {str(e)}")
+    
 
-#     for card in cards_to_return:
-#         card.dropped = False
-#         card.picked_up = False
-#         card.player_id = None
-#         card.discardInt = 0 # Reiniciar el orden de descarte
-#         card.draft = False # Asegurarse de que no esté en el draft pile
-#     try:
-#         db.commit()
-#         db.refresh(game)
-#         for card in cards_to_return:
-#             db.refresh(card)
-#         return {"message": "Cards returned to draw pile and event card removed from game."}
-#     except Exception as e:
-#         db.rollback()
-#         raise HTTPException(status_code=500, detail=f"Error executing 'Delay the Murderer's Escape!': {str(e)}")
+    return last_discarded_cards
+    
 
 
 def early_train_paddington(game_id: int, db: Session):
