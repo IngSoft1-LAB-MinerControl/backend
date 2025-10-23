@@ -17,6 +17,7 @@ class Player_Base(BaseModel):
 
 class Player_State(Player_Base) : 
     turn_order : int
+    isSelected : bool 
     cards : list[AllCardsResponse]
     secrets : list[Secret_Response]
     sets : list[Set_Response]

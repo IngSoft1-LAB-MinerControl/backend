@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException  #te permite definir las rutas o subrutas por separado
 from sqlalchemy.orm import Session  
+from src.database.services.services_websockets import broadcast_player_state
 from src.database.database import SessionLocal, get_db
 from src.database.models import Game, Player 
 from src.schemas.players_schemas import Player_Base
@@ -56,3 +57,34 @@ def delete_player(player_id: int, db:Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=f"Error deleting player: {str(e)}")
     return None
 
+#el punto de esto es que al seleccionar un jugador le permitimos hacer acciones fuera de su turno, en eventos como en los cuales debe elegir un secretoa revelar y asi
+
+@player.put("/select/player/{player_id}",status_code = 201 ,tags = {"Players"})
+async def select_player (player_id : int, db : Session = Depends(get_db)) : 
+    player = db.query(Player).filter(Player.player_id == player_id).first()
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
+    game_id = player.game_id
+    player.isSelected = True 
+    try : 
+        db.commit()
+        await broadcast_player_state (game_id)
+    except Exception as e : 
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error selecting player: {str(e)}")
+    return None
+
+@player.put("/unselect/player/{player_id}",status_code = 201 ,tags = {"Players"})
+async def unselect_player (player_id : int, db : Session = Depends(get_db)) : 
+    player = db.query(Player).filter(Player.player_id == player_id).first()
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
+    game_id = player.game_id
+    player.isSelected = False 
+    try : 
+        db.commit()
+        await broadcast_player_state (game_id)
+    except Exception as e : 
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error selecting player: {str(e)}")
+    return None
