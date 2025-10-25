@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException  #te permite definir las rutas o subrutas por separado
 from sqlalchemy.orm import Session  
-from src.database.services.services_websockets import broadcast_player_state
+from src.database.services.services_websockets import broadcast_game_information, broadcast_player_state
 from src.database.database import SessionLocal, get_db
 from src.database.models import Game, Player 
 from src.schemas.players_schemas import Player_Base
@@ -84,6 +84,28 @@ async def unselect_player (player_id : int, db : Session = Depends(get_db)) :
     try : 
         db.commit()
         await broadcast_player_state (game_id)
+    except Exception as e : 
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error selecting player: {str(e)}")
+    return None
+
+@player.put ("/vote/player/ {player_id}", status_code= 201 , tags = ["Players"])
+async def vote_player (player_id : int , db : Session = Depends (get_db)) : 
+    player = db.query(Player).filter(Player.player_id == player_id).first()
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
+    game_id = player.game_id
+    player.votes_received += 1
+    game = db.query(Game).filter(Game.game_id == game_id).first() 
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+    game.amount_votes += 1 
+    if game.amount_votes == game.players_amount : 
+        game.status = "in course"
+        game.amount_votes = 0
+    try : 
+        db.commit()
+        await broadcast_game_information (game_id)
     except Exception as e : 
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Error selecting player: {str(e)}")

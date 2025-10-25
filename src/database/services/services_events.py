@@ -131,3 +131,27 @@ def early_train_paddington(game_id: int, db: Session):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Error executing 'Early Train to Paddington' event: {str(e)}")
+
+def point_your_suspicion (game_id : int ,db : Session = Depends (get_db)) : 
+    game = db.query(Game).filter(Game.game_id == game_id).first()
+    if not game : 
+        raise HTTPException(status_code=404, detail="Game not found.")
+    game.status = "Voting"
+    try : 
+        db.commit()
+        return {"message": "Point your Suspicion event executed successfully."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error executing 'Point Your Suspicion' event: {str(e)}")
+    
+def end_point_your_suspicion(game_id : int, db :Session = Depends (get_db)) : 
+    game = db.query(Game).filter(Game.game_id == game_id).first()
+    if not game : 
+        raise HTTPException(status_code=404, detail="Game not found.")
+    game.status = "in course"
+    try : 
+        db.commit()
+        return {"message": "Point your Suspicion ending event executed successfully."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error executing 'Point Your Suspicion' ending event: {str(e)}")

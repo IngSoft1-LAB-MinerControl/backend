@@ -21,5 +21,6 @@ class Player_State(Player_Base) :
     cards : list[AllCardsResponse]
     secrets : list[Secret_Response]
     sets : list[Set_Response]
-    social_disgrace : bool 
+    social_disgrace : bool
+    votes_received : int  
     
