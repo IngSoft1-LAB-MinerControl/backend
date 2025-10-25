@@ -15,6 +15,7 @@ class Game(Base):
     players_amount = Column(Integer,nullable = False)
     current_turn = Column(Integer, nullable = True)
     cards_left = Column(Integer , nullable=True)
+    amount_votes = Column (Integer, default = 0)
     players = relationship("Player", back_populates="game")
     cards = relationship("Card", back_populates="game")
     secrets = relationship("Secrets", back_populates="game")
@@ -36,6 +37,7 @@ class Player(Base):
     sets = relationship("Set" , back_populates="player")
     social_disgrace = Column(Boolean, default=False)  # Nueva columna para Social Disgrace
     isSelected = Column(Boolean, default = False)
+    votes_received = Column (Integer, default = 0)
 
 class Card(Base):
     __tablename__ = 'cards'
