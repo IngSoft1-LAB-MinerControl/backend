@@ -64,7 +64,7 @@ def one_more(receive_secret_player_id: int, secret_id: int, db: Session):
         raise HTTPException(status_code=400, detail=f"Error executing 'One More' event: {str(e)}")
 
 
-def delay_the_murderers_escape(game_id: int, db: Session):
+def delay_the_murderers_escape(game_id: int,discarded_cards_ids : list[int] , db: Session):
     """
     Implementa el efecto de la carta 'Delay the Murderer's Escape!'.
     Toma hasta 5 cartas de la pila de descarte y las devuelve al mazo.
@@ -77,14 +77,15 @@ def delay_the_murderers_escape(game_id: int, db: Session):
     
 
     # Agarrro maximo las ultimas 5 cartas descartadas 
-    last_discarded_cards = db.query(Card).filter(
+    delayed_cards = db.query(Card).filter(
         Card.game_id == game_id,
-        Card.dropped == True
-    ).order_by(desc(Card.discardInt)).limit(5).all()
+        Card.dropped == True,
+        Card.card_id.in_(discarded_cards_ids)
+    ).all()
 
-    if not last_discarded_cards:
+    if not delayed_cards:
         raise HTTPException(status_code=404, detail="No cards found in the discard pile for this game.")
-    for card in last_discarded_cards : 
+    for card in delayed_cards : 
         card.dropped = False 
         card.picked_up = False 
         card.draft = False
@@ -98,7 +99,7 @@ def delay_the_murderers_escape(game_id: int, db: Session):
         raise HTTPException(status_code=400, detail=f"Error executing 'Delay murderer escapes' event: {str(e)}")
     
 
-    return last_discarded_cards
+    return delayed_cards
     
 
 
