@@ -131,3 +131,53 @@ def early_train_paddington(game_id: int, db: Session):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Error executing 'Early Train to Paddington' event: {str(e)}")
+
+
+def initiate_card_trade(trader_id: int, tradee_id: int, db: Session):
+    """
+    Marca a dos jugadores con isSelected = True para que el frontend sepa que deben elegir una carta.
+    """
+    trader = db.query(Player).filter(Player.player_id == trader_id).first()
+    tradee = db.query(Player).filter(Player.player_id == tradee_id).first()
+
+    if not trader or not tradee:
+        raise HTTPException(status_code=404, detail="One or both players not found.")
+
+    try:
+        trader.isSelected = True
+        tradee.isSelected = True
+        db.commit()
+        db.refresh(trader)
+        db.refresh(tradee)
+        return {"message": f"Card trade initiated between {trader.name} and {tradee.name}."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error initiating card trade: {str(e)}")
+
+
+def finalize_card_trade(trader_id: int, trader_card_id: int, tradee_id: int, tradee_card_id: int, db: Session):
+    """
+    Intercambia las dos cartas seleccionadas y resetea isSelected a False.
+    """
+    trader = db.query(Player).filter(Player.player_id == trader_id).first()
+    tradee = db.query(Player).filter(Player.player_id == tradee_id).first()
+    trader_card = db.query(Card).filter(Card.card_id == trader_card_id, Card.player_id == trader_id).first()
+    tradee_card = db.query(Card).filter(Card.card_id == tradee_card_id, Card.player_id == tradee_id).first()
+
+    if not all([trader, tradee, trader_card, tradee_card]):
+        raise HTTPException(status_code=404, detail="Invalid player or card IDs provided.")
+
+    try:
+        # Intercambio de dueños
+        trader_card.player_id = tradee_id
+        tradee_card.player_id = trader_id
+
+        # Resetear el estado
+        trader.isSelected = False
+        tradee.isSelected = False
+        
+        db.commit()
+        return {"message": "Card trade finalized successfully."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error finalizing card trade: {str(e)}")

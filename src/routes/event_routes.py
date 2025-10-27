@@ -7,7 +7,7 @@ from src.database.services.services_cards import only_6 , replenish_draft_pile
 from src.database.services.services_games import finish_game
 from src.schemas.card_schemas import Card_Response
 from src.database.services.services_websockets import broadcast_last_discarted_cards, broadcast_game_information , broadcast_player_state, broadcast_card_draft
-from src.database.services.services_events import cards_off_table, look_into_ashes, one_more, early_train_paddington, delay_the_murderers_escape
+from src.database.services.services_events import cards_off_table, look_into_ashes, one_more, early_train_paddington, delay_the_murderers_escape, initiate_card_trade, finalize_card_trade
 import random
 
 events = APIRouter()
@@ -91,5 +91,36 @@ async def activate_delay_murderers_escape (game_id :int, db : Session = Depends(
 
     return discarded_cards
 
-    
+@events.post("/event/card_trade/initiate/{trader_id},{tradee_id}", status_code=200, tags=["Events"])
+async def activate_card_trade_initiate(trader_id: int, tradee_id: int, db: Session = Depends(get_db)):
+    """
+    Inicia el evento 'Card Trade'. Los dos jugadores son marcados para el intercambio.
+    """
+    result = initiate_card_trade(
+        trader_id=trader_id,
+        tradee_id=tradee_id,
+        db=db
+    )
+    player = db.query(Player).filter(Player.player_id == trader_id).first()
+    await broadcast_game_information(player.game_id)
+    return result
+
+@events.post("/event/card_trade/finalize/{trader_id},{tradee_id},{trader_card_id},{tradee_card_id}", status_code=200, tags=["Events"])
+async def activate_card_trade_finalize(trader_id: int, tradee_id: int, trader_card_id: int, tradee_card_id: int, db: Session = Depends(get_db)):
+    """
+    Finaliza el evento 'Card Trade', intercambiando las cartas seleccionadas.
+    trader el que inicia y tradee el elegido para cambiar
+    """
+    result = finalize_card_trade(
+        trader_id=trader_id,
+        trader_card_id=trader_card_id,
+        tradee_id=tradee_id,
+        tradee_card_id=tradee_card_id,
+        db=db
+    )
+    player = db.query(Player).filter(Player.player_id == trader_id).first()
+    await broadcast_game_information(player.game_id)
+    return result
+
+
 

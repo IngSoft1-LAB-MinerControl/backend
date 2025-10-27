@@ -110,8 +110,8 @@ async def test_broadcast_game_information_success(mock_session_local, mock_game_
     )
     # Los jugadores ahora necesitan más campos para Player_State
     mock_players = [
-        Player(player_id=1, name="Jugador 1",game_id = 1,host = True, turn_order=2,birth_date = datetime.date(2000, 1, 1), cards=[], secrets=[], social_disgrace = False),
-        Player(player_id=2, name="Jugador 2",game_id = 1 ,host = False,turn_order=1,birth_date = datetime.date(2000, 4, 4) , cards=[], secrets=[], social_disgrace = False)
+        Player(player_id=1, name="Jugador 1",game_id = 1,host = True, turn_order=2,birth_date = datetime.date(2000, 1, 1), cards=[], secrets=[], social_disgrace = False, isSelected = False),
+        Player(player_id=2, name="Jugador 2",game_id = 1 ,host = False,turn_order=1,birth_date = datetime.date(2000, 4, 4) , cards=[], secrets=[], social_disgrace = False, isSelected = False)
     ]
     mock_db_session.query.return_value.filter.return_value.first.return_value = mock_game
     mock_db_session.query.return_value.options.return_value.filter.return_value.all.return_value = mock_players
@@ -144,7 +144,7 @@ async def test_broadcast_last_discarted_cards_success(mock_session_local, mock_g
     mock_session_local.return_value = mock_db_session
     player_id = 1
     game_id = 10
-    mock_player = Player(player_id=player_id, name="Jugador 1",game_id = game_id,host = True, turn_order=2,birth_date = datetime.date(2000, 1, 1), cards=[], secrets=[], sets = [], social_disgrace = False)
+    mock_player = Player(player_id=player_id, name="Jugador 1",game_id = game_id,host = True, turn_order=2,birth_date = datetime.date(2000, 1, 1), cards=[], secrets=[], sets = [], social_disgrace = False, isSelected = False)
     mock_cards = [
         Event(card_id=101, type="event", game_id=game_id,player_id= player_id, dropped=True,picked_up = True,draft = False ,discardInt=5, name = "Dead card folly"),
         Event(card_id=102, type="event", game_id=game_id,player_id = player_id, dropped=True,picked_up = True ,draft = False,discardInt=4, name = "Point your suspicions")
@@ -197,7 +197,7 @@ async def test_broadcast_last_discarted_cards_no_cards_found(mock_session_local,
     mock_session_local.return_value = mock_db_session
     player_id = 1
     game_id = 10
-    mock_player = Player(player_id=player_id, name="Jugador 1",game_id = game_id,host = True, turn_order=2,birth_date = datetime.date(2000, 1, 1), cards=[], secrets=[],sets = [], social_disgrace=False)
+    mock_player = Player(player_id=player_id, name="Jugador 1",game_id = game_id,host = True, turn_order=2,birth_date = datetime.date(2000, 1, 1), cards=[], secrets=[],sets = [], social_disgrace=False, isSelected = False)
         # Configura los diferentes resultados para las llamadas a la DB
      # Configura el mock para la primera llamada a la DB: db.query(Player)
     mock_db_session.query.return_value.filter.return_value.first.return_value = mock_player
