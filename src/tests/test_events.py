@@ -169,3 +169,30 @@ async def test_look_into_ashes_card_not_in_discard_pile(client, setup_events_dat
     response = client.put("/event/look_into_ashes/2,1")
     assert response.status_code == 404
     assert "Card not found" in response.json()["detail"]
+
+@pytest.mark.asyncio 
+@patch('src.routes.event_routes.broadcast_last_discarted_cards', new_callable=AsyncMock)
+@patch('src.routes.event_routes.broadcast_game_information', new_callable=AsyncMock)
+async def test_delay_murderers_escape (mock_broadcast_game, mock_broadcast_discard, client, setup_events_data, db_session) : 
+    game = Game(game_id=2, name="Short Deck Game", status="in course", max_players=2, min_players=2, players_amount=2, cards_left = 46)
+    db_session.add(game) 
+    db_session.commit()
+    
+    card1 = Event(name="C1", player_id=None, game_id=game.game_id, picked_up=True, dropped=True)
+    card2 = Event(name="C2", player_id=None, game_id=game.game_id, picked_up=True, dropped=True)
+    db_session.add_all([card1, card2]) 
+    db_session.commit()
+    card_ids_to_delay = [card1.card_id, card2.card_id]
+
+    response = client.put(
+        f"/event/delay_escape/{game.game_id}",
+        json={"card_ids": card_ids_to_delay}
+    )
+    assert response.status_code == 200 
+    data = response.json()
+    assert data[0]["dropped"] is False 
+    assert data[1]["dropped"] is False 
+    assert data[0]["picked_up"] is False 
+    assert data[1]["picked_up"] is False 
+    assert data[0]["discardInt"] == -1  
+    assert data[1]["discardInt"] == -1
