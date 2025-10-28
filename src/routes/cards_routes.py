@@ -171,6 +171,8 @@ def get_top_discard_pile(game_id: int, db: Session = Depends(get_db)):
 @card.put("/cards/game/drop_list/{player_id}" , status_code=200, tags = ["Cards"], response_model=list[Card_Response])
 async def select_cards_to_discard(player_id: int, discard_request: Discard_List_Request, db: Session = Depends(get_db)):
     card_ids = discard_request.card_ids
+
+    early_train_discarded = False
     
     if not card_ids:
         raise HTTPException(status_code=400, detail="Se requiere una lista de IDs de cartas.")
@@ -200,11 +202,11 @@ async def select_cards_to_discard(player_id: int, discard_request: Discard_List_
         # 4. ITERAR Y ACTUALIZAR
         for card_obj in cards_to_discard:
             card_obj.discardInt = next_discard_int
+            card_obj.player_id = None
             card_obj.dropped = True
             card_obj.picked_up = False
             updated_cards.append(card_obj)
             next_discard_int += 1
-        
         db.commit()
 
         # 5. REFRESCAR Y RETORNAR (Uniformidad: refrescamos los objetos)

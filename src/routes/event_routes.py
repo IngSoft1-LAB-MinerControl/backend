@@ -59,7 +59,7 @@ async def activate_early_train_paddington_event(game_id: int, db: Session = Depe
     if not game:
         raise HTTPException(status_code=404, detail="Game not found.")
     
-    result = early_train_paddington(game_id=game_id, db=db)
+    result = await early_train_paddington(game_id=game_id, db=db)
     await broadcast_game_information(game_id)
     await broadcast_last_discarted_cards(game_id)
     return result

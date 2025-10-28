@@ -103,7 +103,7 @@ def delay_the_murderers_escape(game_id: int,discarded_cards_ids : list[int] , db
     
 
 
-def early_train_paddington(game_id: int, db: Session):
+async def early_train_paddington(game_id: int, db: Session):
     """
     Implement the effect of the 'Early Train to Paddington' event.
     """
@@ -113,18 +113,19 @@ def early_train_paddington(game_id: int, db: Session):
         raise HTTPException(status_code=404, detail="Deck not found.")
     
     if len(deck)<6:
-        finish_game(game_id) # se termina el juego si no hay mas cartas en el mazo
+        await finish_game(game_id) # se termina el juego si no hay mas cartas en el mazo
         return {"message": "Not enough cards in the deck. The game has ended."}
     
     random.shuffle(deck)
-    max_discardInt = db.query(func.max(Card.discardInt)).filter(Card.game_id == game_id).scalar() or 0
-    cards_to_discard = deck[:6]
-    for card in cards_to_discard:
-        card.dropped = True
-        card.picked_up = False
-        max_discardInt += 1
-        card.discardInt = max_discardInt # Asigna el siguiente valor en la secuencia
     try:
+        max_discardInt = db.query(func.max(Card.discardInt)).filter(Card.game_id == game_id).scalar() or 0
+        cards_to_discard = deck[:6]
+        for card in cards_to_discard:
+            card.dropped = True
+            card.picked_up = False
+            max_discardInt += 1
+            card.discardInt = max_discardInt # Asigna el siguiente valor en la secuencia
+        game_id.cards_left -= 6
         db.commit()
         for card in cards_to_discard:
             db.refresh(card)
