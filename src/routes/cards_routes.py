@@ -172,6 +172,7 @@ def get_top_discard_pile(game_id: int, db: Session = Depends(get_db)):
 @card.put("/cards/game/drop_list/{player_id}" , status_code=200, tags = ["Cards"], response_model=list[Card_Response])
 async def select_cards_to_discard(player_id: int, discard_request: Discard_List_Request, db: Session = Depends(get_db)):
     card_ids = discard_request.card_ids
+    early_train = 0
 
     if not card_ids:
         raise HTTPException(status_code=400, detail="Se requiere una lista de IDs de cartas.")
@@ -207,8 +208,9 @@ async def select_cards_to_discard(player_id: int, discard_request: Discard_List_
             updated_cards.append(card_obj)
             next_discard_int += 1
             event = db.query(Event).filter(Event.card_id == card_obj.card_id).first()
-            if event and event.name == "Early Train to Paddington":
-                await early_train_paddington(card_obj.game_id, db)
+            if event and event.name == "Early train to paddington":
+                early_train += 1
+
         db.commit()
 
         # 5. REFRESCAR Y RETORNAR (Uniformidad: refrescamos los objetos)
@@ -217,6 +219,9 @@ async def select_cards_to_discard(player_id: int, discard_request: Discard_List_
              db.refresh(card_obj)
 
         # 6. BROADCAST (La parte clave para que desaparezcan del frontend)
+        for _ in range(early_train):
+            await early_train_paddington(cards_to_discard[0].game_id, db)
+            await broadcast_game_information(cards_to_discard[0].game_id)
         await broadcast_last_discarted_cards(player_id)
         
         return updated_cards
