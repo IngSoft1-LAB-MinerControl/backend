@@ -208,7 +208,7 @@ async def select_cards_to_discard(player_id: int, discard_request: Discard_List_
             next_discard_int += 1
             event = db.query(Event).filter(Event.card_id == card_obj.card_id).first()
             if event and event.name == "Early Train to Paddington":
-                early_train_paddington(card_obj.game_id, db)
+                await early_train_paddington(card_obj.game_id, db)
         db.commit()
 
         # 5. REFRESCAR Y RETORNAR (Uniformidad: refrescamos los objetos)

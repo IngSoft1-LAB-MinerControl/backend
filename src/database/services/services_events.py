@@ -127,7 +127,7 @@ async def early_train_paddington(game_id: int, db: Session):
             card.picked_up = False
             max_discardInt += 1
             card.discardInt = max_discardInt # Asigna el siguiente valor en la secuencia
-        game.cards_left -= - 6
+        game.cards_left -=  6
         db.commit()
         for card in cards_to_discard:
             db.refresh(card)
