@@ -27,6 +27,20 @@ async def play_set_of2(card_id : int , card_id_2:int , db:Session=Depends(get_db
     if (card_1.name == "Harley Quin Wildcard" and card_2.name == "Harley Quin Wildcard"):
         raise HTTPException(status_code=400 , detail=f"You can't play this set")
     
+    if((card_1.name == "Harley Quin Wildcard" and card_2.name == "Mr Satterthwaite") or 
+       (card_2.name == "Harley Quin Wildcard" and card_1.name == "Mr Satterthwaite")):
+        new_set = Set(name = "Mr Satterthwaite + Harley Quin" , 
+                      player_id = card_2.player_id ,
+                      game_id = card_2.game_id)
+        db.add(new_set)
+        try:
+            db.commit()
+            db.refresh(new_set)
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=400, detail=f"Error creating set: {str(e)}")
+
+
     if (card_1.name == "Harley Quin Wildcard"):
         new_set = Set(name = card_2.name , 
                       player_id = card_2.player_id ,
@@ -172,3 +186,68 @@ async def steal_set( player_id_to : int, set_id : int, db : Session = Depends(ge
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Error stealing set: {str(e)}")
+
+
+@set.put("/add/detective/{card_id}/{set_id}", status_code= 201,response_model= Set_Response, tags= ["Sets"])
+async def add_detective(card_id : int, set_id : int, db : Session = Depends(get_db)):
+    detective = db.query(Detective).filter(Detective.card_id == card_id).first()
+    set = db.query(Set).filter(Set.set_id == set_id).first()
+
+    if not detective or not set:
+        raise HTTPException(status_code=400, detail=f"Invalid card or set id")
+    
+    if (detective.name == "Adriane Oliver"):
+        detective.set_id = set.set_id
+        detective.player_id = None
+        try : 
+            db.commit()
+            db.refresh(detective)
+            await broadcast_player_state(set.game_id)
+            return set
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=400, detail=f"Error adding set: {str(e)}")
+    
+    if set.player_id != detective.player_id:
+        raise HTTPException(status_code=400, detail=f"This is not your set")
+
+    if(detective.name == set.name):
+        detective.set_id = set.set_id
+        detective.player_id = None
+        try : 
+            db.commit()
+            db.refresh(detective)
+            await broadcast_player_state(set.game_id)
+            return set
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=400, detail=f"Error adding set: {str(e)}")
+        
+    elif(set.name == "Mr Satterthwaite + Harley Quin" and detective.name == "Mr Satterthwaite"):
+        detective.set_id = set.set_id
+        detective.player_id = None
+        try : 
+            db.commit()
+            db.refresh(detective)
+            await broadcast_player_state(set.game_id)
+            return set
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=400, detail=f"Error adding set: {str(e)}")
+        
+    elif((set.name == "Beresford brothers" or set.name == "Tuppence Beresford" or set.name == "Tommy Beresford") and 
+          (detective.name == "Tuppence Beresford" or detective.name == "Tommy Beresford")):
+        detective.set_id = set.set_id
+        detective.player_id = None
+        try : 
+            db.commit()
+            db.refresh(detective)
+            await broadcast_player_state(set.game_id)
+            return set
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=400, detail=f"Error adding set: {str(e)}")
+        
+    
+
+        
