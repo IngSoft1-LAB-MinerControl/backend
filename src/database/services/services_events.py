@@ -108,7 +108,9 @@ async def early_train_paddington(game_id: int, db: Session):
     Implement the effect of the 'Early Train to Paddington' event.
     """
     deck = db.query(Card).filter(Card.game_id == game_id, Card.player_id == None, Card.draft == False).all()
-    
+    game = db.query(Game).filter(Game.game_id == game_id).first()
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found.")
     if not deck:
         raise HTTPException(status_code=404, detail="Deck not found.")
     
@@ -125,7 +127,7 @@ async def early_train_paddington(game_id: int, db: Session):
             card.picked_up = False
             max_discardInt += 1
             card.discardInt = max_discardInt # Asigna el siguiente valor en la secuencia
-        game_id.cards_left -= 6
+        game.cards_left = len(deck) - 6
         db.commit()
         for card in cards_to_discard:
             db.refresh(card)
